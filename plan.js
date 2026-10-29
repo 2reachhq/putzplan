@@ -1,5 +1,5 @@
 /* Putzplan – Kalender wie in der Verwaltungs-App: links die Wohnungen (nur Nummern), rechts die Tage zum Seitwärts-Scrollen,
-   jede Buchung ein Balken mit der Gästezahl. Fehlen Angaben, ist der Balken rot. Darunter, was am gewählten Tag zu tun ist.
+   jede Buchung ein Balken mit der Gästezahl. Fehlen Angaben, ist der Balken rot. Darunter, welche Wohnung am gewählten Tag zu putzen ist.
    Liest zwei ausgeblendete Blätter der Google-Tabelle:
    „Buchungen“ (A Wohnung, B Anreise, C Abreise als Tageszahl, D Gäste, E fehlt) und
    „Daten“ (A Datum, B Art, C Text, D1 Stand). Lädt beim Öffnen, alle 5 Minuten und beim Zurückkehren zur Seite neu. */
@@ -52,8 +52,13 @@
     if(!wgs.length)zeilen='<div class="r"><div class="lab"></div><div class="trk leer" style="width:'+(N*W)+'px"></div></div>';
 
     /* Was am gewählten Tag zu tun ist – dieselben Zeilen wie bisher */
+    /* Beim Antippen eines Tages nur kurz: welche Wohnung an dem Tag zu putzen ist (dort reisen Gäste ab), dazu die Tonnen */
     const zt=daten.filter(z=>z.d===gewaehlt);const titel=(zt.find(z=>z.art==='tag')||{}).text||'';
-    const zeil=zt.filter(z=>z.art!=='tag').map(z=>'<div class="z '+esc(z.art||'')+'">'+esc(z.text)+'</div>').join('');
+    const putz=[...new Set(buch.filter(b=>b.ab===gewaehlt).map(b=>b.wg))].sort((a,b)=>String(a).localeCompare(String(b),'de',{numeric:true}));
+    const tonnen=zt.filter(z=>z.art==='blau'||z.art==='gelb'||z.art==='grau'||z.art==='tonne');
+    const zeil=putz.map(wg=>'<div class="z">WG '+esc(wg)+' – '+esc(C.t.putzen)+'</div>').join('')
+      +(putz.length?'':'<div class="z leer">'+esc(C.t.nichts)+'</div>')
+      +tonnen.map(z=>'<div class="z">'+esc(z.text)+'</div>').join('');
     const tagKarte='<section class="tag'+(gewaehlt===heute?' heute':gewaehlt<heute?' vorbei':'')+'"><h2>'+(gewaehlt===heute?'<span class="badge">'+esc(C.t.heute)+'</span>':'')+esc(titel)+'</h2>'+zeil+'</section>';
 
     el('inhalt').innerHTML='<div class="karte"><div class="kal" id="kal"><div class="kin" style="width:'+(W+N*W)+'px">'
