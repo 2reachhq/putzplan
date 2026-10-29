@@ -95,6 +95,36 @@
   if(el('anleitungOk'))el('anleitungOk').addEventListener('click',()=>{el('anleitung').hidden=true});
   if('serviceWorker' in navigator)navigator.serviceWorker.register('../sw.js',{scope:'./'}).catch(()=>{});
 
+  /* Webseiten-Push: Schalter an = beim Dienst anmelden (Abend-Meldung), aus = abmelden. Auf dem iPhone gibt es Push
+     nur in der Home-Bildschirm-App – vorher erklärt der Schalter, wie es geht. */
+  const pk=el('push'),ph=el('pushHinweis'),P=C.push||{};const D=self.DIENST;
+  const pushGeht='serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+  const zeige=(an)=>{pk.setAttribute('aria-pressed',an?'true':'false')};
+  const hinweis=t=>{ph.innerHTML=t||'';ph.hidden=!t};
+  const dienst=o=>fetch(D,{method:'POST',body:JSON.stringify(o)}).then(r=>r.json());
+  const b64=s=>{const p=(s+'===').slice(0,s.length+(4-s.length%4)%4).replace(/-/g,'+').replace(/_/g,'/');return Uint8Array.from(atob(p),c=>c.charCodeAt(0))};
+  /* Ausschalten nur nach Rückfrage – als eigenes Fenster, nicht das graue Browser-confirm() */
+  function fragen(){const d=el('ausFrage');if(!d||!d.showModal)return Promise.resolve(confirm(P.aus));
+    el('ausText').textContent=P.aus;el('ausJa').textContent=P.ausJa;el('ausNein').textContent=P.ausNein;
+    return new Promise(ok=>{const fertig=v=>{d.close();ok(v)};el('ausJa').onclick=()=>fertig(true);el('ausNein').onclick=()=>fertig(false);
+      d.oncancel=e=>{e.preventDefault();fertig(false)};d.onclick=e=>{if(e.target===d)fertig(false)};d.showModal()})}
+  async function abo(){const reg=await navigator.serviceWorker.ready;return reg.pushManager.getSubscription()}
+  if(pk&&D){pk.hidden=false;
+    if(pushGeht)abo().then(s=>zeige(!!s&&Notification.permission==='granted')).catch(()=>{});
+    pk.addEventListener('click',async()=>{hinweis('');
+      if(iphone&&!alsApp()){hinweis(P.iphone);return}
+      if(!pushGeht){hinweis(P.nein);return}
+      pk.classList.add('laeuft');
+      try{const reg=await navigator.serviceWorker.ready;const alt=await reg.pushManager.getSubscription();
+        if(pk.getAttribute('aria-pressed')==='true'){if(!await fragen())return;if(alt){await alt.unsubscribe();dienst({typ:'abmelden',endpoint:alt.endpoint}).catch(()=>{})}zeige(false);return}
+        const erlaubt=await Notification.requestPermission();if(erlaubt!=='granted'){hinweis(P.block);zeige(false);return}
+        const key=(await fetch(D+'?typ=vapid').then(r=>r.json())).key;
+        const sub=alt||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64(key)});
+        const r=await dienst({typ:'abo',haus:location.pathname.includes('/poether/')?'poether':'kranz',sub:sub.toJSON()});if(!r||!r.ok)throw new Error('abo');
+        zeige(true);reg.showNotification(P.an,{body:P.anText,icon:'../icons/icon-192.png',tag:'putzplan-an'})}
+      catch(err){console.warn('Push',err);hinweis(P.fehler);zeige(false)}
+      finally{pk.classList.remove('laeuft')}})}
+
   laden();setInterval(()=>{if(document.visibilityState==='visible')laden()},5*60*1000);
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')laden()});
 })();
