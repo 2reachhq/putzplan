@@ -25,7 +25,7 @@
   async function laden(){if(laeuft)return;laeuft=true;
     try{const [d,b]=await Promise.all([holen('Daten'),holen('Buchungen').catch(()=>null)]);
       if(!d||!d.table)throw new Error('leer');
-      el('stand').textContent=((d.table.cols||[])[3]||{}).label||'';
+      {const l=((d.table.cols||[])[3]||{}).label||'';const m=/(\d{1,2}\.\d{1,2}\.)\S*\s+(\d{1,2}:\d{2})/.exec(l);el('stand').textContent=m?m[1]+' '+m[2]:''}
       daten=(d.table.rows||[]).map(x=>({d:+wert(x,0),art:wert(x,1),text:wert(x,2)})).filter(z=>z.d&&z.text);
       buch=b&&b.table?(b.table.rows||[]).map(x=>({wg:wert(x,0),an:wert(x,1),ab:wert(x,2),g:wert(x,3),fehlt:+wert(x,4)===1})).filter(z=>z.wg!=null):[];
       zeigen()}
