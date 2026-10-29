@@ -205,15 +205,17 @@ function einrichten(){const P=PropertiesService.getScriptProperties();
 
 /* ---------- P-256 / ES256 für VAPID – reines JavaScript, weil Apps Script keine Kurven-Signatur kennt ----------
    Nonce nach RFC 6979 (deterministisch), damit keine schwache Zufallsquelle den Schlüssel verrät. */
+/* Der Apps-Script-Editor kennt keine BigInt-Zahlen mit angehängtem n – deshalb die Zahlen als Konstanten */
+const N0=BigInt(0),N1=BigInt(1),N2=BigInt(2),N3=BigInt(3);
 const EC={p:BigInt('0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff'),n:BigInt('0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551'),
   b:BigInt('0x5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b'),
   G:[BigInt('0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296'),BigInt('0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5')]};
-const md=(a,m)=>{const r=a%m;return r<0n?r+m:r};
-function minv(a,m){let[o,r]=[md(a,m),m],[s,t]=[1n,0n];while(r){const q=o/r;[o,r]=[r,o-q*r];[s,t]=[t,s-q*t]}return md(s,m)}
+const md=(a,m)=>{const r=a%m;return r<N0?r+m:r};
+function minv(a,m){let[o,r]=[md(a,m),m],[s,t]=[N1,N0];while(r){const q=o/r;[o,r]=[r,o-q*r];[s,t]=[t,s-q*t]}return md(s,m)}
 function padd(P,Q){if(!P)return Q;if(!Q)return P;const p=EC.p;let l;
-  if(P[0]===Q[0]){if(md(P[1]+Q[1],p)===0n)return null;l=md((3n*P[0]*P[0]-3n)*minv(2n*P[1],p),p)}else l=md((Q[1]-P[1])*minv(Q[0]-P[0],p),p);
+  if(P[0]===Q[0]){if(md(P[1]+Q[1],p)===N0)return null;l=md((N3*P[0]*P[0]-N3)*minv(N2*P[1],p),p)}else l=md((Q[1]-P[1])*minv(Q[0]-P[0],p),p);
   const x=md(l*l-P[0]-Q[0],p);return[x,md(l*(P[0]-x)-P[1],p)]}
-function pmul(k,P){let R=null,A=P;while(k>0n){if(k&1n)R=padd(R,A);A=padd(A,A);k>>=1n}return R}
+function pmul(k,P){let R=null,A=P;while(k>N0){if((k&N1)!==N0)R=padd(R,A);A=padd(A,A);k=k>>N1}return R}
 const u8=a=>a.map(x=>x&255);
 const bytes=s=>u8(Utilities.newBlob(s).getBytes());
 const sha256=b=>u8(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,b));
@@ -224,10 +226,10 @@ const b64e=b=>Utilities.base64EncodeWebSafe(b.map(x=>x>127?x-256:x)).replace(/=+
 const b64d=s=>u8(Utilities.base64DecodeWebSafe(s+'==='.slice((s.length+3)%4)));
 function signieren(nachricht,d){const h=sha256(nachricht);const e=md(zuZahl(h),EC.n);const x=zuBytes(d,32),hb=zuBytes(e,32);
   let V=new Array(32).fill(1),K=new Array(32).fill(0);K=hmac(K,[...V,0,...x,...hb]);V=hmac(K,V);K=hmac(K,[...V,1,...x,...hb]);V=hmac(K,V);
-  for(;;){V=hmac(K,V);const k=zuZahl(V);if(k>0n&&k<EC.n){const R=pmul(k,EC.G);const r=md(R[0],EC.n);if(r!==0n){const s=md(minv(k,EC.n)*(e+r*d),EC.n);if(s!==0n)return[...zuBytes(r,32),...zuBytes(s,32)]}}
+  for(;;){V=hmac(K,V);const k=zuZahl(V);if(k>N0&&k<EC.n){const R=pmul(k,EC.G);const r=md(R[0],EC.n);if(r!==N0){const s=md(minv(k,EC.n)*(e+r*d),EC.n);if(s!==N0)return[...zuBytes(r,32),...zuBytes(s,32)]}}
     K=hmac(K,[...V,0]);V=hmac(K,V)}}
 function vapidSchluessel(){const h=sha256(bytes(Utilities.getUuid()+Utilities.getUuid()+Utilities.getUuid()+Utilities.getUuid()+Date.now()));
-  const d=md(zuZahl(h),EC.n-1n)+1n;const Q=pmul(d,EC.G);return{d:b64e(zuBytes(d,32)),pub:b64e([4,...zuBytes(Q[0],32),...zuBytes(Q[1],32)])}}
+  const d=md(zuZahl(h),EC.n-N1)+N1;const Q=pmul(d,EC.G);return{d:b64e(zuBytes(d,32)),pub:b64e([4,...zuBytes(Q[0],32),...zuBytes(Q[1],32)])}}
 function vapidJwt(aud,dBytes){const kopf=b64e(bytes(JSON.stringify({typ:'JWT',alg:'ES256'})));
   const inhalt=b64e(bytes(JSON.stringify({aud,exp:Math.floor(Date.now()/1000)+12*3600,sub:SEITE})));
   return kopf+'.'+inhalt+'.'+b64e(signieren(bytes(kopf+'.'+inhalt),zuZahl(dBytes)))}
