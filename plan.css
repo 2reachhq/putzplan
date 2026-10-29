@@ -45,3 +45,8 @@ main{padding:10px 10px calc(28px + env(safe-area-inset-bottom,0px));max-width:56
 .bk.vorbei{background:#9BC4BA}
 .bk.rot{background:#D93636}
 .kal::-webkit-scrollbar{height:0}
+.tonnen .trk{height:46px}.tonnen .lab{color:#555}
+.tn{position:absolute;top:0;bottom:0;width:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.tc{display:flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#444;line-height:1.1;white-space:nowrap}
+.tc i{width:10px;height:10px;border-radius:3px;display:inline-block;flex-shrink:0}
+.tc.raus{color:#161616}

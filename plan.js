@@ -9,6 +9,7 @@
   const ausZahl=z=>new Date(Date.UTC(1899,11,30)+z*864e5);
   const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const HAUS='<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>';
+  const TONNE='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg>';
   const PERSON='<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><circle cx="12" cy="7.5" r="4"/><path d="M4 21c0-4.4 3.6-7.5 8-7.5s8 3.1 8 7.5z"/></svg>';
   let nr=0,laeuft=false,gewaehlt=null,gezeigtFuer=0,daten=null,buch=null;
   try{history.scrollRestoration='manual'}catch(e){}
@@ -49,6 +50,12 @@
         const x=(b.an-von+.5)*W+2,w=(ab-b.an)*W-4;const rot=b.fehlt;
         balken+='<div class="bk'+(rot?' rot':'')+(b.ab&&b.ab<=heute?' vorbei':'')+'" style="left:'+x+'px;width:'+w+'px">'+PERSON+'<b>'+(b.g?esc(b.g):'?')+'</b></div>'}
       zeilen+='<div class="r"><div class="lab">'+esc(wg)+'</div><div class="trk" style="width:'+(N*W)+'px">'+balken+'</div></div>'}
+    /* Tonnen als eigene Zeile: am Tag vor der Abholung RAUS, am Abholtag wieder REIN – in der Farbe der Tonne */
+    const TF={blau:'#2F6FDB',gelb:'#F2C200',grau:'#8A8A8A'};const ton=daten.filter(z=>TF[z.art]&&z.d>=von&&z.d<=bis);
+    if(ton.length){let m='';const proTag={};for(const z of ton)(proTag[z.d]=proTag[z.d]||[]).push(z);
+      for(const [d,L] of Object.entries(proTag)){m+='<div class="tn" style="left:'+((d-von)*W)+'px">'+L.map(z=>{const raus=/OUT|RAUS|வெளியே/i.test(z.text);
+        return '<span class="tc'+(raus?' raus':'')+'"><i style="background:'+TF[z.art]+'"></i>'+esc(raus?C.t.raus:C.t.rein)+'</span>'}).join('')+'</div>'}
+      zeilen+='<div class="r tonnen"><div class="lab">'+TONNE+'</div><div class="trk" style="width:'+(N*W)+'px">'+m+'</div></div>'}
     if(!wgs.length)zeilen='<div class="r"><div class="lab"></div><div class="trk leer" style="width:'+(N*W)+'px"></div></div>';
 
     /* Was am gewählten Tag zu tun ist – dieselben Zeilen wie bisher */
