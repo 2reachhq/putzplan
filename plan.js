@@ -81,18 +81,9 @@
       if(tage.length)z=Math.min(...tage)+Math.floor((e.clientX-r.left)/W)}}
     if(z!=null&&daten){gewaehlt=z;zeigen()}});
 
-  /* Auf den Home-Bildschirm: Android/Chrome bietet das Installieren selbst an (beforeinstallprompt), auf dem iPhone geht
-     es nur über „Teilen → Zum Home-Bildschirm“ – dann zeigt der Knopf die Anleitung. Läuft die Seite schon als App, bleibt
-     der Knopf weg. */
-  let angebot=null;const knopf=el('install');
+  /* Auf dem iPhone gibt es Webseiten-Push nur in der Home-Bildschirm-App (Apple-Vorgabe) – das erklärt der Schalter selbst. */
   const alsApp=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
   const iphone=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-  if(knopf&&!alsApp())knopf.hidden=false;
-  addEventListener('beforeinstallprompt',e=>{e.preventDefault();angebot=e;if(knopf&&!alsApp())knopf.hidden=false});
-  addEventListener('appinstalled',()=>{if(knopf)knopf.hidden=true;el('anleitung').hidden=true});
-  if(knopf)knopf.addEventListener('click',async()=>{if(angebot){angebot.prompt();try{await angebot.userChoice}catch(e){}angebot=null;return}
-    el('anleitungText').innerHTML=iphone?C.inst.ios:C.inst.andere;el('anleitung').hidden=false});
-  if(el('anleitungOk'))el('anleitungOk').addEventListener('click',()=>{el('anleitung').hidden=true});
   if('serviceWorker' in navigator)navigator.serviceWorker.register('../sw.js',{scope:'./'}).catch(()=>{});
 
   /* Webseiten-Push: Schalter an = beim Dienst anmelden (Abend-Meldung), aus = abmelden. Auf dem iPhone gibt es Push
@@ -109,9 +100,10 @@
     return new Promise(ok=>{const fertig=v=>{d.close();ok(v)};el('ausJa').onclick=()=>fertig(true);el('ausNein').onclick=()=>fertig(false);
       d.oncancel=e=>{e.preventDefault();fertig(false)};d.onclick=e=>{if(e.target===d)fertig(false)};d.showModal()})}
   async function abo(){const reg=await navigator.serviceWorker.ready;return reg.pushManager.getSubscription()}
-  if(pk&&D){pk.hidden=false;
+  if(pk){pk.hidden=false;
     if(pushGeht)abo().then(s=>zeige(!!s&&Notification.permission==='granted')).catch(()=>{});
     pk.addEventListener('click',async()=>{hinweis('');
+      if(!D){hinweis(P.nichtEingerichtet);return}
       if(iphone&&!alsApp()){hinweis(P.iphone);return}
       if(!pushGeht){hinweis(P.nein);return}
       pk.classList.add('laeuft');
