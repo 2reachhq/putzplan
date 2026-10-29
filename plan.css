@@ -4,7 +4,7 @@ body{margin:0;background:#F2F2F2;color:#161616;font:18px/1.4 -apple-system,Blink
 header{position:sticky;top:0;z-index:2;background:#2B8C78;color:#fff;padding:7px 14px 6px;padding-top:calc(7px + env(safe-area-inset-top,0px))}
 header h1{margin:0;font-size:17px;line-height:1.2}
 #stand{font-size:11.5px;opacity:.85;margin-top:1px}
-main{padding:12px 12px calc(28px + env(safe-area-inset-bottom,0px));max-width:560px;margin:0 auto}
+main{padding:10px 10px calc(28px + env(safe-area-inset-bottom,0px));max-width:560px;margin:0 auto}
 .tag{background:#fff;border-radius:16px;padding:12px 14px;margin:0 0 12px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
 .tag h2{margin:0 0 6px;font-size:19px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .tag{scroll-margin-top:60px}
@@ -19,3 +19,29 @@ main{padding:12px 12px calc(28px + env(safe-area-inset-bottom,0px));max-width:56
 .hinweis{background:#fff;border-radius:16px;padding:18px;color:#555;text-align:center}
 .legende{font-size:14px;color:#666;display:flex;flex-wrap:wrap;gap:6px 14px;margin:4px 4px 0}
 .legende span{display:inline-flex;align-items:center;gap:6px}.legende i{width:14px;height:14px;border-radius:4px;display:inline-block}
+
+/* Kalender: links Wohnungen (sticky), rechts die Tage – seitwärts scrollen */
+.karte{background:#fff;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.06);overflow:hidden;margin-bottom:12px}
+.kal{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.kin{position:relative}
+.r{display:flex;position:relative;z-index:1}
+.lab{position:sticky;left:0;z-index:3;flex:0 0 44px;width:44px;display:flex;align-items:center;justify-content:center;background:#fff;border-right:1px solid #E6E6E6;border-bottom:1px solid #EFEFEF;font-size:18px;font-weight:700;color:#161616}
+.ecke{color:#2B8C78;align-items:flex-end;padding-bottom:12px}
+.trk{position:relative;flex:none;height:52px;border-bottom:1px solid #EFEFEF;background-image:linear-gradient(to right,#F0F0F0 1px,transparent 1px);background-size:44px 100%}
+.kopf .trk{height:76px;background-image:none}
+.kopf .lab{height:76px}
+.kt{position:absolute;top:0;width:44px;height:100%;border:0;background:none;font:inherit;color:#161616;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 0 6px;cursor:pointer}
+.kt .mo{position:absolute;top:5px;left:4px;font-size:11px;font-weight:700;white-space:nowrap;color:#555}
+.kt .wd{font-size:11px;color:#8A8A8A}
+.kt .nr{font-size:15px;font-weight:700;width:28px;height:28px;line-height:28px;border-radius:50%;text-align:center}
+.kt.vorbei .nr,.kt.vorbei .wd{color:#B3B3B3}
+.kt.wahl .nr{background:#161616;color:#fff}
+.kt.heute .nr{background:#EE7310;color:#fff}
+.sp{position:absolute;top:0;bottom:0;width:44px;z-index:0}
+.sp.heute{background:#FFF1E3}
+.sp.wahl{background:#F2F2F2}
+.bk{position:absolute;top:50%;transform:translateY(-50%);height:32px;border-radius:16px;background:#2B8C78;color:#fff;display:flex;align-items:center;justify-content:center;gap:3px;font-size:15px;overflow:hidden;white-space:nowrap}
+.bk b{font-weight:700}
+.bk.vorbei{background:#9BC4BA}
+.bk.rot{background:#D93636}
+.kal::-webkit-scrollbar{height:0}
