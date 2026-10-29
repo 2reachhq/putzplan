@@ -20,7 +20,7 @@ main{padding:10px 10px calc(28px + env(safe-area-inset-bottom,0px));max-width:56
 .z.fehlt{background:#FCD2D2;color:#A51B1B;border-radius:10px;padding:9px 12px;border-top:0;margin-top:4px}
 .z.leer{color:#8A8A8A;font-weight:500;font-size:16px}
 .hinweis{background:#fff;border-radius:16px;padding:18px;color:#555;text-align:center}
-.legende{font-size:14px;color:#666;display:flex;flex-wrap:wrap;gap:6px 14px;margin:4px 4px 0}
+.legende{font-size:14px;color:#666;display:flex;flex-wrap:wrap;gap:6px 14px;margin:14px 4px 0}
 .legende span{display:inline-flex;align-items:center;gap:6px}.legende i{width:14px;height:14px;border-radius:4px;display:inline-block}
 
 /* Kalender: links Wohnungen (sticky), rechts die Tage – seitwärts scrollen */
@@ -53,4 +53,7 @@ main{padding:10px 10px calc(28px + env(safe-area-inset-bottom,0px));max-width:56
 .tc{display:flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:#444;line-height:1.1;white-space:nowrap}
 .tc i{width:10px;height:10px;border-radius:3px;display:inline-block;flex-shrink:0}
 .tc.raus{color:#161616}
-.glocke{display:flex;align-items:center;justify-content:center;gap:8px;margin:18px 0 0;padding:12px 14px;border-radius:14px;background:#fff;border:1px solid #E2E2E2;color:#161616;font-size:16px;font-weight:600;text-decoration:none}
+.aktion{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;margin:14px 0 0;padding:14px;border-radius:14px;border:1px solid #E2E2E2;background:#fff;color:#161616;font:inherit;font-size:17px;font-weight:600;cursor:pointer}
+.aktion.klein{width:auto;margin:10px auto 0;padding:8px 22px;font-size:15px}
+.anleitung{margin:10px 0 0;padding:14px;border-radius:14px;background:#FFF4E8;border:1px solid #F5C9A0;font-size:16px;line-height:1.45;text-align:center}
+.anleitung p{margin:0}.anleitung .sym{display:inline-block;padding:0 4px;border:1px solid #bbb;border-radius:6px;font-size:14px}
