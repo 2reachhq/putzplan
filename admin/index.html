@@ -36,7 +36,7 @@ main{padding-bottom:120px}
 .blatt h2{margin:0;font-size:24px}.blatt .unter{font-size:12px;color:#777;margin-top:-8px}
 .raster{display:grid;grid-template-columns:1fr 1fr;gap:10px}.raster .breit{grid-column:1/-1}
 .feld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#666;min-width:0}
-.feld.rot input{border-color:#D93636;background:#FFF5F5}
+.feld.rot input,.feld.rot select{border-color:#D93636;background:#FFF5F5}
 .knoepfe{display:flex;gap:8px}.knoepfe .knopf{flex:1}
 .code{align-self:flex-start;display:flex;align-items:center;gap:10px;font:inherit;padding:8px 8px 8px 14px;border-radius:12px;border:1px solid #E2E2E2;background:#F6F6F6;color:#161616;cursor:pointer;max-width:100%}
 .code span{font-size:16px;font-weight:700;letter-spacing:.02em;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -128,7 +128,7 @@ main{padding-bottom:120px}
       +'<div class="raster"><label class="feld breit">Wohnung<select name="wohnung">'+wohn.map(o=>'<option value="'+o.v+'"'+(o.v===b.haus+'|'+b.wg?' selected':'')+'>'+esc(o.t)+'</option>').join('')+'</select></label>'
       +'<label class="feld">'+(neu?'Ab':'Anreise')+'<input type="date" name="anreise" value="'+esc(b.anreise)+'" required></label>'
       +'<label class="feld'+(!b.abreise?' rot':'')+'">Bis wann<input type="date" name="abreise" value="'+esc(b.abreise)+'"></label>'
-      +'<label class="feld'+(!b.gaeste?' rot':'')+'">Personen<input type="number" inputmode="numeric" min="1" max="20" name="gaeste" value="'+esc(b.gaeste)+'"></label>'
+      +'<label class="feld'+(!b.gaeste?' rot':'')+'">Personen<select name="gaeste"><option value="">–</option>'+[1,2,3,4,5,6,7].concat(+b.gaeste>7?[+b.gaeste]:[]).map(n=>'<option'+(+b.gaeste===n?' selected':'')+'>'+n+'</option>').join('')+'</select></label>'
       +'<label class="feld">Name<input type="text" name="gast" value="'+esc(b.gast)+'" placeholder="'+(neu?'Blockiert':'')+'"></label></div>'
       +'<div class="knoepfe"><button class="knopf hell" type="button" id="bZu">Abbrechen</button><button class="knopf" value="ok" id="bOk">'+(b.pruefen&&!neu?'Geprüft':'Übernehmen')+'</button></div>'
       +(neu?'':'<button class="knopf rot" type="button" id="bStorno">Buchung stornieren</button>');
