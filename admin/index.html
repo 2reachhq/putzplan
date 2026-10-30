@@ -37,6 +37,10 @@ main{padding-bottom:120px}
 .feld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#666;min-width:0}
 .feld.rot input{border-color:#D93636;background:#FFF5F5}
 .knoepfe{display:flex;gap:8px}.knoepfe .knopf{flex:1}
+.code{align-self:flex-start;display:flex;align-items:center;gap:10px;font:inherit;padding:8px 8px 8px 14px;border-radius:12px;border:1px solid #E2E2E2;background:#F6F6F6;color:#161616;cursor:pointer;max-width:100%}
+.code span{font-size:16px;font-weight:700;letter-spacing:.02em;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.code em{font-style:normal;font-size:12px;font-weight:600;background:#161616;color:#fff;border-radius:8px;padding:6px 10px;white-space:nowrap}
+.code.ok{border-color:#2B8C78}.code.ok em{background:#2B8C78}
 </style></head>
 <body><header><div class="kz"><div><span class="ort">Admin</span><h1>Buchungen</h1></div><div class="st"><span>Stand</span><b id="stand"></b></div></div></header>
 <main id="app"><div class="hinweis">…</div></main>
@@ -109,10 +113,14 @@ main{padding-bottom:120px}
     zaehler()}
   function zaehler(){pub.disabled=!offen.size;pub.textContent=offen.size?'Veröffentlichen ('+offen.size+')':'Veröffentlichen'}
 
+  /* Buchungsnummer mit einem Tipp in die Zwischenablage; ältere Safari-Fassungen über ein verstecktes Feld */
+  function kopieren(t){if(navigator.clipboard&&window.isSecureContext)return navigator.clipboard.writeText(t).then(()=>true,()=>alt());return Promise.resolve(alt());
+    function alt(){const f=document.createElement('textarea');f.value=t;f.setAttribute('readonly','');f.style.cssText='position:fixed;top:0;opacity:0';blatt.appendChild(f);f.select();f.setSelectionRange(0,t.length);let ok=false;try{ok=document.execCommand('copy')}catch(e){}f.remove();return ok}}
   /* ---------- Blatt: Buchung ändern oder Tag blockieren ---------- */
   function oeffnen(id,vorgabe){const neu=!id;const b=neu?{id:'neu'+(++neuNr),quelle:'direkt',status:'bestaetigt',...vorgabe}:stand(daten.buchungen.find(x=>x.id===id));
     const h=hausVon(b.haus);const wohn=daten.haeuser.flatMap(x=>x.wgs.map(w=>({v:x.id+'|'+w,t:x.name.replace(/ \d+$/,'')+' · WG '+w+' – '+((x.namen||{})[w]||'')})));
-    bf.innerHTML='<h2>'+(neu?'Blockieren':esc(b.gast||'Buchung'))+'</h2><div class="unter">'+(neu?esc(h?h.name:''):esc(b.quelle==='airbnb'?'Airbnb':b.quelle==='booking'?'Booking':'Direkt')+(b.code?' · '+esc(b.code):'')+(b.pruefen?' · geändert – bitte prüfen':''))+'</div>'
+    bf.innerHTML='<h2>'+(neu?'Blockieren':esc(b.gast||'Buchung'))+'</h2><div class="unter">'+(neu?esc(h?h.name:''):esc(b.quelle==='airbnb'?'Airbnb':b.quelle==='booking'?'Booking':'Direkt')+(b.pruefen?' · geändert – bitte prüfen':''))+'</div>'
+      +(neu||!b.code?'':'<button type="button" class="code" id="bCode" title="Buchungsnummer kopieren"><span>'+esc(b.code)+'</span><em>Kopieren</em></button>')
       +'<div class="raster"><label class="feld breit">Wohnung<select name="wohnung">'+wohn.map(o=>'<option value="'+o.v+'"'+(o.v===b.haus+'|'+b.wg?' selected':'')+'>'+esc(o.t)+'</option>').join('')+'</select></label>'
       +'<label class="feld">'+(neu?'Ab':'Anreise')+'<input type="date" name="anreise" value="'+esc(b.anreise)+'" required></label>'
       +'<label class="feld'+(!b.abreise?' rot':'')+'">Bis wann<input type="date" name="abreise" value="'+esc(b.abreise)+'"></label>'
@@ -121,6 +129,7 @@ main{padding-bottom:120px}
       +'<div class="knoepfe"><button class="knopf hell" type="button" id="bZu">Abbrechen</button><button class="knopf" value="ok" id="bOk">Übernehmen</button></div>'
       +(neu?'':'<button class="knopf rot" type="button" id="bStorno">Buchung stornieren</button>');
     bf.querySelector('#bZu').onclick=()=>blatt.close();
+    const cb=bf.querySelector('#bCode');if(cb)cb.onclick=()=>kopieren(b.code).then(ok=>{const e=cb.querySelector('em');cb.classList.toggle('ok',ok);e.textContent=ok?'Kopiert ✓':'Nicht möglich';clearTimeout(cb.t);cb.t=setTimeout(()=>{cb.classList.remove('ok');e.textContent='Kopieren'},1800)});
     const nehmen=status=>{const f=new FormData(bf);const[hh,ww]=String(f.get('wohnung')||'|').split('|');
       const felder={haus:hh,wg:ww,anreise:f.get('anreise')||'',abreise:f.get('abreise')||'',gaeste:f.get('gaeste')||'',gast:f.get('gast')||(neu?'Blockiert':'')};
       if(felder.abreise&&felder.anreise&&felder.abreise<=felder.anreise){alert('„Bis wann“ muss nach dem Anfang liegen.');return false}
