@@ -50,7 +50,8 @@ main{padding-bottom:120px}
 (function(){
   const D=self.DIENST;const app=document.getElementById('app');const W=44,LAB=88;
   const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  let pin='';try{pin=localStorage.getItem('putzplan.pin')||''}catch(e){}
+  /* Angemeldet bleiben: die PIN merkt sich nur DIESES Gerät, 7 Tage lang */
+  const TAGE7=7*864e5;let pin='';try{pin=localStorage.getItem('putzplan.pin')||'';if(!(+localStorage.getItem('putzplan.pinBis')>Date.now())){pin='';localStorage.removeItem('putzplan.pin')}}catch(e){}
   let daten=null;const offen=new Map();let neuNr=0,scrollX=null;
   const dienst=o=>fetch(D,{method:'POST',body:JSON.stringify({...o,pin})}).then(r=>r.json());
   const WT=['So','Mo','Di','Mi','Do','Fr','Sa'],MON=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
@@ -66,7 +67,7 @@ main{padding-bottom:120px}
     app.innerHTML='<form class="box" id="f"><b>Anmelden</b><input class="pin" type="password" inputmode="numeric" pattern="[0-9]*" id="p1" placeholder="PIN" autocomplete="current-password" required>'
       +(fehler?'<div class="fehler">'+esc(fehler)+'</div>':'')+'<button class="knopf">Weiter</button></form>';
     document.getElementById('f').onsubmit=async e=>{e.preventDefault();pin=document.getElementById('p1').value.trim();
-      const r=await dienst({typ:'login'}).catch(()=>null);if(r&&r.ok){try{localStorage.setItem('putzplan.pin',pin)}catch(e){}laden()}else anmelden(r?'PIN falsch (nach 5 Fehlversuchen 1 Stunde gesperrt).':'Keine Verbindung.')}}
+      const r=await dienst({typ:'login'}).catch(()=>null);if(r&&r.ok){try{localStorage.setItem('putzplan.pin',pin);localStorage.setItem('putzplan.pinBis',String(Date.now()+TAGE7))}catch(e){}laden()}else anmelden(r?'PIN falsch (nach 5 Fehlversuchen 1 Stunde gesperrt).':'Keine Verbindung.')}}
 
   async function laden(){const r=await dienst({typ:'liste'}).catch(()=>null);if(!r||!r.ok){anmelden(r&&r.fehler==='passwort'?'':'Keine Verbindung.');return}
     daten=r;offen.clear();unten.hidden=false;zeigen();document.getElementById('stand').textContent=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}

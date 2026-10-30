@@ -33,11 +33,11 @@ const T={
   en:{wt:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],anz:n=>n?(n===1?'1 guest':n+' guests'):'? guests',
     keinCheckin:'no bookings right now',nichtsZuTun:'nothing to do',farbe:{blau:'blue',gelb:'yellow',grau:'grey'},
     raus:f=>'Bins: '+f+' bin OUT (pickup tomorrow)',rein:f=>'Bins: '+f+' bin back IN',stand:'Updated ',rot:' · red = please ask',
-    morgen:'Tomorrow',putzen:'clean',titel:'Cleaning Plan'},
+    morgen:'Tomorrow',heute:'Today',update:'New',putzen:'clean',titel:'Cleaning Plan'},
   ta:{wt:['ஞாயிறு','திங்கள்','செவ்வாய்','புதன்','வியாழன்','வெள்ளி','சனி'],anz:n=>(n||'?')+' பேர்',
     keinCheckin:'இப்போது booking இல்லை',nichtsZuTun:'வேலை இல்லை',farbe:{blau:'நீல',gelb:'மஞ்சள்',grau:'சாம்பல்'},
     raus:f=>f+' குப்பைத் தொட்டியை வெளியே வைக்கவும் (நாளை எடுப்பார்கள்)',rein:f=>f+' குப்பைத் தொட்டியை உள்ளே கொண்டு வரவும்',
-    stand:'Stand ',rot:' · rot = bitte nachfragen',morgen:'நாளை',putzen:'சுத்தம் செய்யவும்',titel:'Putzplan'}};
+    stand:'Stand ',rot:' · rot = bitte nachfragen',morgen:'நாளை',heute:'இன்று',update:'புதிது',putzen:'சுத்தம் செய்யவும்',titel:'Putzplan'}};
 
 /* ---------- Datum (immer deutsche Zeit, nie die des Servers) ---------- */
 const heuteIso=()=>Utilities.formatDate(new Date(),'Europe/Berlin','yyyy-MM-dd');
@@ -105,7 +105,7 @@ function abgleich(tage){const lock=LockService.getScriptLock();if(!lock.tryLock(
     const Q=[['ab','from:automated@airbnb.com (subject:"Buchung bestätigt" OR subject:"Storniert: Buchung" OR subject:"Buchung aktualisiert") newer_than:'+t+'d'],
       ['bk','from:noreply@booking.com (subject:"neue Buchung" OR subject:"Last-Minute-Buchung" OR subject:storniert OR subject:geändert) newer_than:'+t+'d'],
       ['bn','from:guest.booking.com newer_than:'+t+'d']];
-    const neu=[];
+    const neu=[];const geaendert=[];
     for(const[art,q]of Q){for(let start=0;start<500;start+=100){const th=GmailApp.search(q,start,100);
       for(const thr of th)for(const msg of thr.getMessages()){const id=msg.getId();if(gesehen.has(id))continue;gesehen.add(id);neuGesehen.push([id]);neu.push([art,msg])}
       if(th.length<100)break}}
@@ -113,11 +113,12 @@ function abgleich(tage){const lock=LockService.getScriptLock();if(!lock.tryLock(
     neu.sort((a,b)=>a[1].getDate().getTime()-b[1].getDate().getTime());
     for(const[art,msg]of neu){const m={subject:msg.getSubject(),text:msg.getPlainBody(),datum:msg.getDate().getTime(),von:msg.getFrom()};let x=null;
       try{x=art==='ab'?leseAirbnb(m):art==='bk'?leseBooking(m):leseBookingNachricht(m)}catch(e){console.error(e)}
-      if(x&&zusammen(L,x))n++}
+      if(x){const vorher=(L.find(o=>o.id===x.id)||{}).abreise;if(zusammen(L,x)){n++;geaendert.push(Object.assign({},L.find(o=>o.id===x.id),{alteAbreise:vorher}))}}}
     if(neuGesehen.length){const ab=sh.getLastRow()+1;const fehlt=ab+neuGesehen.length-1-sh.getMaxRows();if(fehlt>0)sh.insertRowsAfter(sh.getMaxRows(),fehlt+100);
       sh.getRange(ab,1,neuGesehen.length,1).setNumberFormat('@').setValues(neuGesehen)}
     if(n)buchungenSchreiben(L);
-    oeffentlichSchreiben(L)}
+    oeffentlichSchreiben(L);
+    try{sofortMelden(L,geaendert)}catch(e){console.error(e)}}
   finally{lock.releaseLock()}}
 
 /* Fehlt die Abreise und beginnt am NÄCHSTEN Tag in derselben Wohnung die nächste Buchung, war es genau eine Nacht
@@ -161,18 +162,36 @@ function aufgaben(hk,d,L){const S=T[HAEUSER[hk].sprache];const M=muellLesen()[hk
   const zeilen=wgs.map(w=>'WG '+w+' – '+S.putzen+(ab.some(b=>+b.wg===w&&b.unsicher)?' (?)':''));
   M.filter(x=>x.datum===plus(d,1)&&S.farbe[x.art]).forEach(x=>zeilen.push(S.raus(S.farbe[x.art])));
   return zeilen}
-function meldung(hk){const H=HAEUSER[hk];const S=T[H.sprache];const m=plus(heuteIso(),1);const z=aufgaben(hk,m);
-  return{title:S.morgen+' · '+S.wt[new Date(m+'T12:00:00Z').getUTCDay()]+' '+m.slice(8)+'.'+m.slice(5,7)+'. · '+H.name,body:z.length?z.join('\n'):S.nichtsZuTun,url:SEITE+hk+'/',leer:!z.length}}
+/* Meldungstext für einen Tag. Der Push selbst kommt ohne Inhalt; der Service Worker holt sich danach den zuletzt
+   gesendeten Text ab (doGet typ=meldung) – deshalb wird jeder gesendete Text je Haus gespeichert. */
+function meldungFuer(hk,d,L,update){const H=HAEUSER[hk];const S=T[H.sprache];const z=aufgaben(hk,d,L);const heute=heuteIso();
+  return{title:(update?S.update+' · ':'')+(d===heute?S.heute:S.morgen)+' · '+S.wt[new Date(d+'T12:00:00Z').getUTCDay()]+' '+d.slice(8)+'.'+d.slice(5,7)+'. · '+H.name,
+    body:z.length?z.join('\n'):S.nichtsZuTun,url:SEITE+hk+'/',leer:!z.length}}
+function meldung(hk){const m=PropertiesService.getScriptProperties().getProperty('meldung_'+hk);
+  if(m){try{const o=JSON.parse(m);if(Date.now()-o.zeit<36*3600e3)return o}catch(e){}}return meldungFuer(hk,plus(heuteIso(),1))}
 
 /* ---------- 2. Webseiten-Push (VAPID, ohne Inhalt: die Seite holt den Text selbst über doGet) ---------- */
-function abendPush(){const L=buchungenLesen();const sh=blatt('Abos');const v=sh.getDataRange().getValues();const weg=[];
-  const jwts={};const P=PropertiesService.getScriptProperties();const d=b64d(P.getProperty('VAPID_D'));const pub=P.getProperty('VAPID_PUB');
-  for(const hk in HAEUSER){if(!aufgaben(hk,plus(heuteIso(),1),L).length)continue;
-    for(let i=1;i<v.length;i++){const[endpoint,haus]=v[i];if(haus!==hk||!endpoint)continue;
-      const aud=String(endpoint).match(/^https:\/\/[^/]+/)[0];const jwt=jwts[aud]||(jwts[aud]=vapidJwt(aud,d));
-      const r=UrlFetchApp.fetch(endpoint,{method:'post',headers:{TTL:'43200',Urgency:'normal',Authorization:'vapid t='+jwt+', k='+pub},muteHttpExceptions:true});
-      const c=r.getResponseCode();if(c===404||c===410)weg.push(i+1);else if(c>=300)console.warn('Push '+c+' '+r.getContentText().slice(0,200))}}
+function pushen(hk,msg){const P=PropertiesService.getScriptProperties();P.setProperty('meldung_'+hk,JSON.stringify(Object.assign({},msg,{zeit:Date.now()})));
+  const sh=blatt('Abos');const v=sh.getDataRange().getValues();const weg=[];const jwts={};const d=b64d(P.getProperty('VAPID_D'));const pub=P.getProperty('VAPID_PUB');
+  for(let i=1;i<v.length;i++){const[endpoint,haus]=v[i];if(haus!==hk||!endpoint)continue;
+    const aud=String(endpoint).match(/^https:\/\/[^/]+/)[0];const jwt=jwts[aud]||(jwts[aud]=vapidJwt(aud,d));
+    const r=UrlFetchApp.fetch(endpoint,{method:'post',headers:{TTL:'43200',Urgency:'high',Authorization:'vapid t='+jwt+', k='+pub},muteHttpExceptions:true});
+    const c=r.getResponseCode();if(c===404||c===410)weg.push(i+1);else if(c>=300)console.warn('Push '+c+' '+r.getContentText().slice(0,200))}
   weg.reverse().forEach(z=>sh.deleteRow(z))}
+/* Abends um 18 Uhr: was morgen zu tun ist (nur wenn etwas zu tun ist). Der gemeldete Stand wird gemerkt. */
+function abendPush(){const L=buchungenLesen();const P=PropertiesService.getScriptProperties();const m=plus(heuteIso(),1);
+  Object.keys(P.getProperties()).forEach(k=>{const x=/^gemeldet_\w+_(\d{4}-\d{2}-\d{2})$/.exec(k);if(x&&x[1]<heuteIso())P.deleteProperty(k)});
+  for(const hk in HAEUSER){const z=aufgaben(hk,m,L);P.setProperty('gemeldet_'+hk+'_'+m,JSON.stringify(z));if(z.length)pushen(hk,meldungFuer(hk,m,L))}}
+/* SOFORT melden: Ändert eine neue Buchung, eine Änderung oder ein Storno die Aufgaben für HEUTE oder MORGEN, geht sofort
+   eine Meldung raus („Neu“) – unabhängig von der Abend-Meldung. Verglichen wird mit dem zuletzt gemeldeten Stand; gab es
+   für den Tag noch keinen, zählt nur ein Tag, den eine geänderte Buchung tatsächlich betrifft (sonst liefe beim ersten
+   Abgleich des Tages grundlos eine Meldung hinaus). */
+function sofortMelden(L,geaendert){if(!geaendert.length)return;const P=PropertiesService.getScriptProperties();const heute=heuteIso();
+  for(const hk in HAEUSER)for(const d of[heute,plus(heute,1)]){const key='gemeldet_'+hk+'_'+d;const alt=P.getProperty(key);const z=aufgaben(hk,d,L);const neu=JSON.stringify(z);
+    if(alt===neu)continue;
+    const betroffen=geaendert.some(b=>b.haus===hk&&[b.anreise,b.abreise,b.alteAbreise,plus(b.anreise||'2000-01-01',1)].includes(d));
+    if(alt==null&&(!betroffen||!z.length))continue;
+    P.setProperty(key,neu);pushen(hk,meldungFuer(hk,d,L,true))}}
 
 /* ---------- 3. Web-App ---------- */
 const json=o=>ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
@@ -194,12 +213,14 @@ function doPost(e){let x={};try{x=JSON.parse(e.postData.contents)}catch(err){ret
     try{const L=buchungenLesen();const fertig=[];const jetzt=new Date().toISOString();
       for(const a of x.aenderungen||[]){let b=/^neu/.test(a.id||'')?null:L.find(o=>o.id===a.id);
         if(!b){if(!/^neu/.test(a.id||''))continue;b={id:'man-'+Date.now()+'-'+fertig.length,quelle:'direkt',status:'bestaetigt'};SPALTEN.forEach(k=>{if(b[k]==null)b[k]=''});L.push(b)}
-        const f=a.felder||{};for(const k of['haus','wg','anreise','abreise','gaeste','status','gast'])if(k in f){let v=f[k];
+        const vorher=b.abreise;const f=a.felder||{};for(const k of['haus','wg','anreise','abreise','gaeste','status','gast'])if(k in f){let v=f[k];
           if(k==='haus'&&!HAEUSER[v])continue;if((k==='anreise'||k==='abreise')&&v&&!/^\d{4}-\d{2}-\d{2}$/.test(v))continue;
           if(k==='wg'||k==='gaeste')v=v===''||v==null?'':Math.max(0,Math.min(40,parseInt(v,10)||0))||'';if(k==='status'&&v!=='storniert')v='bestaetigt';
           if(k==='gast')v=String(v||'').slice(0,80);b[k]=v}
-        b.admin=jetzt;b.geaendert=jetzt;b.pruefen='';fertig.push({vorher:a.id,buchung:b})}
-      buchungenSchreiben(L);oeffentlichSchreiben(L);return json({ok:true,fertig})}
+        b.admin=jetzt;b.geaendert=jetzt;b.pruefen='';fertig.push({vorher:a.id,buchung:b,alteAbreise:vorher})}
+      buchungenSchreiben(L);oeffentlichSchreiben(L);
+      try{sofortMelden(L,fertig.map(x=>Object.assign({},x.buchung,{alteAbreise:x.alteAbreise})))}catch(e){console.error(e)}
+      return json({ok:true,fertig:fertig.map(x=>({vorher:x.vorher,buchung:x.buchung}))})}
     finally{lock.releaseLock()}}
   if(x.typ==='abgleich'){abgleich(7);return json({ok:true})}
   return json({fehler:'typ'})}
