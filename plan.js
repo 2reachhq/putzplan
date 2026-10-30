@@ -32,6 +32,7 @@
     catch(e){if(!daten)el('inhalt').innerHTML='<div class="hinweis">'+esc(C.t.fehler)+'</div>'}
     finally{laeuft=false}}
 
+  const monat=dt=>String(dt.getUTCMonth()+1).padStart(2,'0')+'/'+dt.getUTCFullYear();
   function zeigen(){const heute=tagZahl(new Date());
     const tage=[...new Set(daten.filter(z=>z.art==='tag').map(z=>z.d))].sort((a,b)=>a-b);
     if(!tage.length){el('inhalt').innerHTML='<div class="hinweis">'+esc(C.t.leer)+'</div>';return}
@@ -42,8 +43,10 @@
 
     let kopf='';for(let i=0;i<N;i++){const z=von+i;const dt=ausZahl(z);const tg=dt.getUTCDate();
       kopf+='<button class="kt'+(z===heute?' heute':'')+(z===gewaehlt?' wahl':'')+(z<heute?' vorbei':'')+'" style="left:'+(i*W)+'px" data-z="'+z+'">'
-        +((tg===1||i===0)?'<span class="mo">'+esc(C.mon[dt.getUTCMonth()])+'</span>':'')
         +'<span class="wd">'+esc(C.wt[dt.getUTCDay()])+'</span><span class="nr">'+tg+'</span></button>'}
+    /* Monat als „06/2026“ über seinem Abschnitt: bleibt beim Seitwärtsscrollen links an der Linie stehen, bis der nächste ihn wegschiebt */
+    for(let i=0;i<N;){const dt=ausZahl(von+i);let n=1;while(i+n<N&&ausZahl(von+i+n).getUTCDate()!==1)n++;
+      kopf+='<div class="mseg'+(i?'':' erst')+'" style="left:'+(i*W)+'px;width:'+(n*W)+'px"><span class="mo">'+monat(dt)+'</span></div>';i+=n}
     const spalte=(z,k)=>z>=von&&z<=bis?'<div class="'+k+'" style="left:'+(W+(z-von)*W)+'px"></div>':'';
     let zeilen='';for(const wg of wgs){let balken='';
       for(const b of buch){if(b.wg!==wg||!b.an)continue;const ohneAb=!b.ab;const ab=ohneAb?b.an+1:b.ab;if(ab<von||b.an>bis)continue;

@@ -17,6 +17,7 @@ main{padding-bottom:120px}
 .adm .lab{flex-basis:88px;width:88px;flex-direction:column;align-items:flex-start;justify-content:center;padding:0 8px;gap:1px}
 .adm .lab b{font-size:16px}.adm .lab small{font-size:12px;font-weight:500;color:#8A8A8A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:72px}
 .adm .ecke{align-items:center}
+.adm .mseg .mo{left:96px}
 .adm .trk{cursor:pointer}
 .bk{cursor:pointer}.bk.pruefen{background:#EE7310}.bk.offen{box-shadow:0 0 0 3px #161616}
 .abschnitt{font-size:12px;font-weight:700;color:#777;text-transform:uppercase;letter-spacing:.04em;margin:18px 4px 8px}.abschnitt.rot{color:#D93636}
@@ -58,7 +59,7 @@ main{padding-bottom:120px}
   const TAGE7=7*864e5;let pin='';try{pin=localStorage.getItem('putzplan.pin')||'';if(!(+localStorage.getItem('putzplan.pinBis')>Date.now())){pin='';localStorage.removeItem('putzplan.pin')}}catch(e){}
   let daten=null;const offen=new Map();let neuNr=0,scrollX=null;
   const dienst=o=>fetch(D,{method:'POST',body:JSON.stringify({...o,pin})}).then(r=>r.json());
-  const WT=['So','Mo','Di','Mi','Do','Fr','Sa'],MON=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+  const WT=['So','Mo','Di','Mi','Do','Fr','Sa'];
   const plus=(s,n)=>{const d=new Date(s+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
   const tage=(a,b)=>Math.round((Date.parse(b+'T12:00:00Z')-Date.parse(a+'T12:00:00Z'))/864e5);
   const dat=s=>s?WT[new Date(s+'T12:00:00Z').getUTCDay()]+' '+s.slice(8)+'.'+s.slice(5,7)+'.':'?';
@@ -84,8 +85,11 @@ main{padding-bottom:120px}
 
   function kalender(h,von,N){const heute=daten.heute;const L=alle().filter(b=>b.haus===h.id&&b.status!=='storniert');
     let kopf='';for(let i=0;i<N;i++){const d=plus(von,i);const dt=new Date(d+'T12:00:00Z');
-      kopf+='<div class="kt'+(d===heute?' heute':'')+(d<heute?' vorbei':'')+'" style="left:'+(i*W)+'px">'+((dt.getUTCDate()===1||i===0)?'<span class="mo">'+MON[dt.getUTCMonth()]+'</span>':'')
+      kopf+='<div class="kt'+(d===heute?' heute':'')+(d<heute?' vorbei':'')+'" style="left:'+(i*W)+'px">'
         +'<span class="wd">'+WT[dt.getUTCDay()]+'</span><span class="nr">'+dt.getUTCDate()+'</span></div>'}
+    /* Monat als „06/2026“: bleibt beim Seitwärtsscrollen links an der Linie stehen, bis der nächste ihn wegschiebt */
+    for(let i=0;i<N;){const dt=new Date(plus(von,i)+'T12:00:00Z');let n=1;while(i+n<N&&plus(von,i+n).slice(8)!=='01')n++;
+      kopf+='<div class="mseg'+(i?'':' erst')+'" style="left:'+(i*W)+'px;width:'+(n*W)+'px"><span class="mo">'+String(dt.getUTCMonth()+1).padStart(2,'0')+'/'+dt.getUTCFullYear()+'</span></div>';i+=n}
     let z='';for(const w of h.wgs){let bars='';
       for(const b of L.filter(x=>+x.wg===+w&&x.anreise)){const ab=b.abreise||plus(b.anreise,1);if(ab<von||b.anreise>plus(von,N-1))continue;
         const x=(tage(von,b.anreise)+.5)*W+5,wd=tage(b.anreise,ab)*W-10;const cls=fehlt(b)?' rot':b.pruefen?' pruefen':'';

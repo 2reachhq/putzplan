@@ -34,7 +34,9 @@ main{padding:10px 10px calc(28px + env(safe-area-inset-bottom,0px));max-width:56
 .kopf .trk{height:76px;background-image:none}
 .kopf .lab{height:76px}
 .kt{position:absolute;top:0;width:48px;height:100%;border:0;background:none;font:inherit;color:#161616;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 0 6px;cursor:pointer}
-.kt .mo{position:absolute;top:5px;left:4px;font-size:11px;font-weight:700;white-space:nowrap;color:#555}
+.mseg{position:absolute;top:0;height:26px;z-index:2;pointer-events:none;border-left:1px solid #E6E6E6;overflow:clip}
+.mseg.erst{border-left:0}
+.mseg .mo{position:sticky;left:52px;display:inline-block;padding:6px 6px 0;font-size:12px;font-weight:700;letter-spacing:.02em;white-space:nowrap;color:#555;font-variant-numeric:tabular-nums}
 .kt .wd{font-size:11px;color:#8A8A8A}
 .kt .nr{font-size:15px;font-weight:700;width:28px;height:28px;line-height:28px;border-radius:50%;text-align:center}
 .kt.vorbei .nr,.kt.vorbei .wd{color:#B3B3B3}
