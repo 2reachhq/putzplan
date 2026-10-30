@@ -275,3 +275,6 @@ function vapidSchluessel(){const h=sha256(bytes(Utilities.getUuid()+Utilities.ge
 function vapidJwt(aud,dBytes){const kopf=b64e(bytes(JSON.stringify({typ:'JWT',alg:'ES256'})));
   const inhalt=b64e(bytes(JSON.stringify({aud,exp:Math.floor(Date.now()/1000)+12*3600,sub:SEITE})));
   return kopf+'.'+inhalt+'.'+b64e(signieren(bytes(kopf+'.'+inhalt),zuZahl(dBytes)))}
+
+/* Bei Bedarf im Editor ausführen: hebt die Sperre nach Fehlversuchen auf und liest die PIN aus „Info“ neu */
+function entsperren(){CacheService.getScriptCache().removeAll(['fehlversuche','adminPin'])}
