@@ -4,7 +4,7 @@
    „Buchungen“ (A Wohnung, B Anreise, C Abreise als Tageszahl, D Gäste, E fehlt) und
    „Daten“ (A Datum, B Art, C Text, D1 Stand). Lädt beim Öffnen, alle 5 Minuten und beim Zurückkehren zur Seite neu. */
 (function(){
-  const C=window.PLAN;const el=id=>document.getElementById(id);const W=44;
+  const C=window.PLAN;const el=id=>document.getElementById(id);const W=48;/* Tagesbreite; Balken laufen von Mitte Anreisetag bis Mitte Abreisetag, mit klarer Lücke dazwischen */
   const tagZahl=d=>Math.round((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())-Date.UTC(1899,11,30))/864e5);
   const ausZahl=z=>new Date(Date.UTC(1899,11,30)+z*864e5);
   const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -47,7 +47,7 @@
     const spalte=(z,k)=>z>=von&&z<=bis?'<div class="'+k+'" style="left:'+(W+(z-von)*W)+'px"></div>':'';
     let zeilen='';for(const wg of wgs){let balken='';
       for(const b of buch){if(b.wg!==wg||!b.an)continue;const ohneAb=!b.ab;const ab=ohneAb?b.an+1:b.ab;if(ab<von||b.an>bis)continue;
-        const x=(b.an-von+.5)*W+2,w=(ab-b.an)*W-4;const rot=b.fehlt;
+        const x=(b.an-von+.5)*W+5,w=(ab-b.an)*W-10;const rot=b.fehlt;
         balken+='<div class="bk'+(rot?' rot':'')+(b.ab&&b.ab<=heute?' vorbei':'')+'" style="left:'+x+'px;width:'+w+'px">'+PERSON+'<b>'+(b.g?esc(b.g):'?')+'</b></div>'}
       zeilen+='<div class="r"><div class="lab">'+esc(wg)+'</div><div class="trk" style="width:'+(N*W)+'px">'+balken+'</div></div>'}
     /* Tonnen als eigene Zeile: am Tag vor der Abholung RAUS, am Abholtag wieder REIN – in der Farbe der Tonne */
