@@ -27,7 +27,7 @@
       if(!d||!d.table)throw new Error('leer');
       {const l=((d.table.cols||[])[3]||{}).label||'';const m=/(\d{1,2}\.\d{1,2}\.)\S*\s+(\d{1,2}:\d{2})/.exec(l);el('stand').textContent=m?m[1]+' '+m[2]:''}
       daten=(d.table.rows||[]).map(x=>({d:+wert(x,0),art:wert(x,1),text:wert(x,2)})).filter(z=>z.d&&z.text);
-      buch=b&&b.table?(b.table.rows||[]).map(x=>({wg:wert(x,0),an:wert(x,1),ab:wert(x,2),g:wert(x,3),fehlt:+wert(x,4)===1})).filter(z=>z.wg!=null):[];
+      buch=b&&b.table?(b.table.rows||[]).map(x=>({wg:wert(x,0),an:wert(x,1),ab:wert(x,2),g:wert(x,3),fehlt:+wert(x,4)===1,unsicher:+wert(x,5)===1})).filter(z=>z.wg!=null):[];
       zeigen()}
     catch(e){if(!daten)el('inhalt').innerHTML='<div class="hinweis">'+esc(C.t.fehler)+'</div>'}
     finally{laeuft=false}}
@@ -51,7 +51,7 @@
         balken+='<div class="bk'+(rot?' rot':'')+(b.ab&&b.ab<=heute?' vorbei':'')+'" style="left:'+x+'px;width:'+w+'px">'+PERSON+'<b>'+(b.g?esc(b.g):'?')+'</b></div>'}
       zeilen+='<div class="r"><div class="lab">'+esc(wg)+'</div><div class="trk" style="width:'+(N*W)+'px">'+balken+'</div></div>'}
     /* Tonnen als eigene Zeile: am Tag vor der Abholung RAUS, am Abholtag wieder REIN – in der Farbe der Tonne */
-    const TF={blau:'#2F6FDB',gelb:'#F2C200',grau:'#8A8A8A'};const ton=daten.filter(z=>TF[z.art]&&z.d>=von&&z.d<=bis);
+    const TF={blau:'#2F6FDB',gelb:'#F2C200',grau:'#8A8A8A'};const ton=daten.filter(z=>TF[z.art]&&z.d>=von&&z.d<=bis&&/OUT|RAUS|வெளியே/i.test(z.text));/* nur „raus“ – reinholen ist selbstverständlich */
     if(ton.length){let m='';const proTag={};for(const z of ton)(proTag[z.d]=proTag[z.d]||[]).push(z);
       for(const [d,L] of Object.entries(proTag)){m+='<div class="tn" style="left:'+((d-von)*W)+'px">'+L.map(z=>{const raus=/OUT|RAUS|வெளியே/i.test(z.text);
         return '<span class="tc'+(raus?' raus':'')+'"><i style="background:'+TF[z.art]+'"></i>'+esc(raus?C.t.raus:C.t.rein)+'</span>'}).join('')+'</div>'}
@@ -61,9 +61,10 @@
     /* Was am gewählten Tag zu tun ist – dieselben Zeilen wie bisher */
     /* Beim Antippen eines Tages nur kurz: welche Wohnung an dem Tag zu putzen ist (dort reisen Gäste ab), dazu die Tonnen */
     const zt=daten.filter(z=>z.d===gewaehlt);const titel=(zt.find(z=>z.art==='tag')||{}).text||'';
-    const putz=[...new Set(buch.filter(b=>b.ab===gewaehlt).map(b=>b.wg))].sort((a,b)=>String(a).localeCompare(String(b),'de',{numeric:true}));
-    const tonnen=zt.filter(z=>z.art==='blau'||z.art==='gelb'||z.art==='grau'||z.art==='tonne');
-    const zeil=putz.map(wg=>'<div class="z">WG '+esc(wg)+' – '+esc(C.t.putzen)+'</div>').join('')
+    const abr=buch.filter(b=>b.ab===gewaehlt);const putz=[...new Set(abr.map(b=>b.wg))].sort((a,b)=>String(a).localeCompare(String(b),'de',{numeric:true}));
+    const unsicher=wg=>abr.some(b=>b.wg===wg&&b.unsicher);/* Abreise nur angenommen → rot, bitte nachfragen */
+    const tonnen=zt.filter(z=>(z.art==='blau'||z.art==='gelb'||z.art==='grau'||z.art==='tonne')&&/OUT|RAUS|வெளியே/i.test(z.text));
+    const zeil=putz.map(wg=>'<div class="z'+(unsicher(wg)?' fehlt':'')+'">WG '+esc(wg)+' – '+esc(C.t.putzen)+(unsicher(wg)?' ?':'')+'</div>').join('')
       +(putz.length?'':'<div class="z leer">'+esc(C.t.nichts)+'</div>')
       +tonnen.map(z=>'<div class="z">'+esc(z.text)+'</div>').join('');
     const tagKarte='<section class="tag'+(gewaehlt===heute?' heute':gewaehlt<heute?' vorbei':'')+'"><h2>'+(gewaehlt===heute?'<span class="badge">'+esc(C.t.heute)+'</span>':'')+esc(titel)+'</h2>'+zeil+'</section>';

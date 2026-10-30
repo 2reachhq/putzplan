@@ -27,7 +27,7 @@ const INSERATE={
   'City-Apartment für Familien 5 Per, 8 Min zum Hbf!':['kranz',3],'Zentrales & ruhiges Apartment in Mönchengladbach':['kranz',4],
   '5 Min zur City | 4 Gäste | Ruhige Lage':['poether',1],'5 Min City | Zentral & Ruhig | Komfort für 2 Pers.':['poether',2],
   'Helles Apartment für 4 Personen in ruhiger Lage':['poether',3]};
-const SPALTEN=['id','quelle','code','gast','haus','wg','anreise','abreise','gaeste','status','unterkunft','geaendert','admin'];
+const SPALTEN=['id','quelle','code','gast','haus','wg','anreise','abreise','gaeste','status','unterkunft','geaendert','admin','pruefen'];
 
 const T={
   en:{wt:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],anz:n=>n?(n===1?'1 guest':n+' guests'):'? guests',
@@ -56,6 +56,7 @@ function zuordnen(x){const s=String(x||'').trim();if(!s)return null;if(INSERATE[
 /* ---------- Mails lesen (gleiche Leser wie in der Buchhaltungs-App) ---------- */
 function leseAirbnb(m){const s=String(m.subject||''),t=String(m.text||'').replace(/\r/g,'');
   const st=/^Storniert: Buchung ([A-Z0-9]{8,})/.exec(s);if(st)return{id:'ab-'+st[1],quelle:'airbnb',code:st[1],status:'storniert'};
+  if(/Buchung aktualisiert/i.test(s)){const c=(/details\/([A-Z0-9]{8,})/.exec(t)||[])[1];return c?{id:'ab-'+c,quelle:'airbnb',code:c,pruefen:true}:null}
   if(!/Buchung bestätigt/i.test(s))return null;const code=(/BESTÄTIGUNGS-CODE\s*\n\s*([A-Z0-9]{8,})/.exec(t)||/details\/([A-Z0-9]{8,})/.exec(t)||[])[1];if(!code)return null;
   const gast=((/Buchung bestätigt\s*[–-]\s*(.+?)\s+kommt am/i.exec(s)||[])[1]||'').trim();const ref=m.datum||Date.now();
   const ci=/Check-in\s+Check-out\s*\n+\s*([^\n]+)/.exec(t);const tage=ci?[...ci[1].matchAll(/\d{1,2}\.\s*[A-Za-zÄäö]{3}/g)].map(x=>tagOhneJahr(x[0],ref)):[];
@@ -67,6 +68,7 @@ function leseBooking(m){const s=String(m.subject||'');const x=/\((\d{6,}),\s*[A-
   const id='bk-'+x[1],an=datumText(x[2]);if(/storniert/i.test(s))return{id,quelle:'booking',code:x[1],anreise:an,status:'storniert'};
   if(!/neue (?:Last-Minute-)?Buchung|Last-Minute-Buchung|geändert|Änderung/i.test(s))return null;
   const flach=String(m.text||'').replace(/\s+/g,'');const hotel=(/hotel_id=(\d+)/.exec(flach)||[])[1]||'';
+  if(/geändert|Änderung/i.test(s))return{id,quelle:'booking',code:x[1],anreise:an,unterkunft:hotel,pruefen:true,aenderung:true};
   return{id,quelle:'booking',code:x[1],anreise:an,unterkunft:hotel,status:'bestaetigt'}}
 function leseBookingNachricht(m){const t=String(m.text||'').replace(/\r/g,'');const flach=t.replace(/\s+/g,'');
   const feld=l=>{const x=new RegExp(l+':\\s*\\n\\s*(.+)').exec(t);return x?x[1].trim():''};
@@ -86,6 +88,10 @@ function buchungenSchreiben(L){const sh=blatt('Buchungen');L.sort((a,b)=>(a.anre
   sh.getRange(1,1,Math.max(werte.length,1),SPALTEN.length).setNumberFormat('@').setValues(werte)}
 /* Mail-Daten in eine Buchung: nur leere Felder füllen, Storno gilt immer */
 function zusammen(L,x){let b=L.find(o=>o.id===x.id);const neu=!b;if(neu){b={id:x.id};SPALTEN.forEach(k=>{if(b[k]==null)b[k]=''});L.push(b)}let w=neu;
+  /* Änderungs-Mail: Die neuen Daten stehen nicht drin – Buchung zum Prüfen markieren. Booking nennt im Betreff die (neue)
+     Anreise: weicht sie ab, gilt sie, und die Abreise ist unbekannt (rot), bis sie im Admin eingetragen ist. */
+  if(x.pruefen){b.pruefen=new Date().toISOString();w=true;if(x.aenderung&&x.anreise&&b.anreise&&b.anreise!==x.anreise){b.anreise=x.anreise;b.abreise=''}
+    if(!b.status)b.status='bestaetigt';x={id:x.id,quelle:x.quelle,code:x.code,unterkunft:x.unterkunft}}
   for(const k in x){const v=x[k];if(k==='id'||v==null||v==='')continue;
     if(k==='status'){if(v==='storniert'&&b.status!=='storniert'){b.status='storniert';w=true}else if(!b.status){b.status=v;w=true}continue}
     if(SPALTEN.includes(k)&&(b[k]==null||b[k]==='')){b[k]=v;w=true}}
@@ -96,24 +102,36 @@ function zusammen(L,x){let b=L.find(o=>o.id===x.id);const neu=!b;if(neu){b={id:x
 function abgleich(tage){const lock=LockService.getScriptLock();if(!lock.tryLock(20000))return;
   try{const sh=blatt('Gesehen');const gesehen=new Set(sh.getRange('A:A').getValues().map(r=>String(r[0])).filter(Boolean));const neuGesehen=[];
     const L=buchungenLesen();let n=0;const t=tage||3;
-    const Q=[['ab','from:automated@airbnb.com (subject:"Buchung bestätigt" OR subject:"Storniert: Buchung") newer_than:'+t+'d'],
+    const Q=[['ab','from:automated@airbnb.com (subject:"Buchung bestätigt" OR subject:"Storniert: Buchung" OR subject:"Buchung aktualisiert") newer_than:'+t+'d'],
       ['bk','from:noreply@booking.com (subject:"neue Buchung" OR subject:"Last-Minute-Buchung" OR subject:storniert OR subject:geändert) newer_than:'+t+'d'],
       ['bn','from:guest.booking.com newer_than:'+t+'d']];
+    const neu=[];
     for(const[art,q]of Q){for(let start=0;start<500;start+=100){const th=GmailApp.search(q,start,100);
-      for(const thr of th)for(const msg of thr.getMessages()){const id=msg.getId();if(gesehen.has(id))continue;gesehen.add(id);neuGesehen.push([id]);
-        const m={subject:msg.getSubject(),text:msg.getPlainBody(),datum:msg.getDate().getTime(),von:msg.getFrom()};let x=null;
-        try{x=art==='ab'?leseAirbnb(m):art==='bk'?leseBooking(m):leseBookingNachricht(m)}catch(e){console.error(e)}
-        if(x&&zusammen(L,x))n++}
+      for(const thr of th)for(const msg of thr.getMessages()){const id=msg.getId();if(gesehen.has(id))continue;gesehen.add(id);neuGesehen.push([id]);neu.push([art,msg])}
       if(th.length<100)break}}
+    /* ältere Mails zuerst – sonst überschreibt eine alte Änderung eine neuere */
+    neu.sort((a,b)=>a[1].getDate().getTime()-b[1].getDate().getTime());
+    for(const[art,msg]of neu){const m={subject:msg.getSubject(),text:msg.getPlainBody(),datum:msg.getDate().getTime(),von:msg.getFrom()};let x=null;
+      try{x=art==='ab'?leseAirbnb(m):art==='bk'?leseBooking(m):leseBookingNachricht(m)}catch(e){console.error(e)}
+      if(x&&zusammen(L,x))n++}
     if(neuGesehen.length){const ab=sh.getLastRow()+1;const fehlt=ab+neuGesehen.length-1-sh.getMaxRows();if(fehlt>0)sh.insertRowsAfter(sh.getMaxRows(),fehlt+100);
       sh.getRange(ab,1,neuGesehen.length,1).setNumberFormat('@').setValues(neuGesehen)}
     if(n)buchungenSchreiben(L);
     oeffentlichSchreiben(L)}
   finally{lock.releaseLock()}}
 
+/* Fehlt die Abreise und beginnt am NÄCHSTEN Tag in derselben Wohnung die nächste Buchung, war es genau eine Nacht
+   (Betreiber: „einen Tag hintereinander heißt immer einen Tag“). Die Abreise wird dann abgeleitet, nicht gespeichert –
+   damit wird an dem Tag geputzt. Nur die letzte Buchung einer solchen Reihe bleibt unbekannt. */
+function ergaenzen(L){const A=L.filter(b=>b.status!=='storniert'&&b.anreise);
+  return L.map(b=>{if(b.abreise||b.status==='storniert'||!b.anreise||!b.wg)return b;const n=plus(b.anreise,1);
+    return A.some(x=>x!==b&&x.haus===b.haus&&+x.wg===+b.wg&&x.anreise===n)?Object.assign({},b,{abreise:n,geschaetzt:true}):b})}
+/* Für die Putzkräfte zusätzlich: bleibt die Abreise unbekannt, wird vorläufig EINE Nacht angenommen – der Putztag
+   erscheint dann trotzdem, aber rot („bitte nachfragen“), bis die Abreise im Admin steht. */
+function fuerPutzplan(L){return ergaenzen(L).map(b=>b.abreise||b.status==='storniert'||!b.anreise?b:Object.assign({},b,{abreise:plus(b.anreise,1),unsicher:true}))}
 /* ---------- Öffentliche Tabellen der Putzkräfte (ohne Namen) ---------- */
 function muellLesen(){const v=blatt('Muell').getDataRange().getDisplayValues();const M={};for(let i=1;i<v.length;i++){const[h,d,a]=v[i];if(h&&d&&a)(M[h]=M[h]||[]).push({datum:d,art:a})}return M}
-function oeffentlichSchreiben(L){const heute=heuteIso();const von=plus(heute,-14);const ende=[heute.slice(0,4)+'-12-31',plus(heute,45)].sort().pop();
+function oeffentlichSchreiben(L){L=fuerPutzplan(L);const heute=heuteIso();const von=plus(heute,-14);const ende=[heute.slice(0,4)+'-12-31',plus(heute,45)].sort().pop();
   const tage=naechte(von,ende)+1;const M=muellLesen();const P=PropertiesService.getScriptProperties();
   const jetzt=Utilities.formatDate(new Date(),'Europe/Berlin','dd.MM., HH:mm');
   for(const hk in HAEUSER){const H=HAEUSER[hk];const S=T[H.sprache];const aktiv=L.filter(b=>b.haus===hk&&b.status!=='storniert'&&b.anreise);
@@ -121,29 +139,27 @@ function oeffentlichSchreiben(L){const heute=heuteIso();const von=plus(heute,-14
     const R=[];
     for(let i=0;i<tage;i++){const d=plus(von,i);R.push([serial(d),'tag',S.wt[new Date(d+'T12:00:00Z').getUTCDay()]+' '+d.slice(8)+'.'+d.slice(5,7)+'.','']);
       const an=aktiv.filter(b=>b.anreise===d).sort((a,b)=>(+a.wg||99)-(+b.wg||99));let z=0;
-      for(const b of an){const fehlt=(!b.gaeste||!b.abreise)&&d>=heute;const putzen=aktiv.some(x=>x!==b&&x.wg===b.wg&&x.abreise===d);
+      for(const b of an){const fehlt=(!b.gaeste||!b.abreise||b.unsicher)&&d>=heute;const putzen=aktiv.some(x=>x!==b&&x.wg===b.wg&&x.abreise===d);
         if(!putzen&&!fehlt&&+b.gaeste===2)continue;
-        R.push([serial(d),fehlt?'fehlt':b.gaeste&&+b.gaeste!==2?'anders':'aufgabe','WG '+(b.wg||'?')+' - '+S.anz(+b.gaeste||null)+' (Out-'+(b.abreise?b.abreise.slice(8)+'.'+b.abreise.slice(5,7):'?')+')','']);z++}
+        R.push([serial(d),fehlt?'fehlt':b.gaeste&&+b.gaeste!==2?'anders':'aufgabe','WG '+(b.wg||'?')+' - '+S.anz(+b.gaeste||null)+' (Out-'+(b.abreise&&!b.unsicher?b.abreise.slice(8)+'.'+b.abreise.slice(5,7):'?')+')','']);z++}
       for(const a of ton(plus(d,1)))if(S.farbe[a]){R.push([serial(d),a,S.raus(S.farbe[a]),'']);z++}
-      for(const a of ton(d))if(S.farbe[a]){R.push([serial(d),a,S.rein(S.farbe[a]),'']);z++}
       if(!z)R.push([serial(d),'leer',an.length?S.nichtsZuTun:S.keinCheckin,''])}
-    const B=[['WG','Anreise','Abreise','Gaeste','Fehlt'],...H.wgs.map(w=>[w,'','','','']),
-      ...aktiv.filter(b=>b.wg&&(b.abreise||b.anreise)>=von&&b.anreise<=ende).map(b=>[+b.wg,serial(b.anreise),b.abreise?serial(b.abreise):'',b.gaeste?+b.gaeste:'',(!b.gaeste||!b.abreise)&&(b.abreise||b.anreise)>=heute?1:0])];
+    const B=[['WG','Anreise','Abreise','Gaeste','Fehlt','Unsicher'],...H.wgs.map(w=>[w,'','','','','']),
+      ...aktiv.filter(b=>b.wg&&(b.abreise||b.anreise)>=von&&b.anreise<=ende).map(b=>[+b.wg,serial(b.anreise),b.abreise?serial(b.abreise):'',b.gaeste?+b.gaeste:'',(!b.gaeste||!b.abreise||b.unsicher)&&(b.abreise||b.anreise)>=heute?1:0,b.unsicher?1:0])];
     const ss=SpreadsheetApp.openById(H.sheet);const hash=Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5,JSON.stringify([R,B]),Utilities.Charset.UTF_8));
     if(P.getProperty('hash_'+hk)!==hash){
       const dSh=ss.getSheetByName('Daten');dSh.getRange('A2:C3000').clearContent();dSh.getRange(1,1,1,3).setValues([['Datum','Art','Text']]);
       dSh.getRange(2,1,R.length,3).setValues(R.map(r=>r.slice(0,3)));
-      const bSh=ss.getSheetByName('Buchungen');bSh.getRange('A1:E600').clearContent();bSh.getRange(1,1,B.length,5).setValues(B);
+      const bSh=ss.getSheetByName('Buchungen');bSh.getRange('A1:F600').clearContent();bSh.getRange(1,1,B.length,6).setValues(B);
       P.setProperty('hash_'+hk,hash)}
     ss.getSheetByName('Daten').getRange('D1').setValue(S.stand+jetzt+S.rot)}}
 
 /* ---------- Was ist an einem Tag zu tun (Push-Meldung) ---------- */
 function aufgaben(hk,d,L){const S=T[HAEUSER[hk].sprache];const M=muellLesen()[hk]||[];
-  const aktiv=(L||buchungenLesen()).filter(b=>b.haus===hk&&b.status!=='storniert');
-  const wgs=[...new Set(aktiv.filter(b=>b.abreise===d&&b.wg).map(b=>+b.wg))].sort((a,b)=>a-b);
-  const zeilen=wgs.map(w=>'WG '+w+' – '+S.putzen);
+  const aktiv=fuerPutzplan(L||buchungenLesen()).filter(b=>b.haus===hk&&b.status!=='storniert');
+  const ab=aktiv.filter(b=>b.abreise===d&&b.wg);const wgs=[...new Set(ab.map(b=>+b.wg))].sort((a,b)=>a-b);
+  const zeilen=wgs.map(w=>'WG '+w+' – '+S.putzen+(ab.some(b=>+b.wg===w&&b.unsicher)?' (?)':''));
   M.filter(x=>x.datum===plus(d,1)&&S.farbe[x.art]).forEach(x=>zeilen.push(S.raus(S.farbe[x.art])));
-  M.filter(x=>x.datum===d&&S.farbe[x.art]).forEach(x=>zeilen.push(S.rein(S.farbe[x.art])));
   return zeilen}
 function meldung(hk){const H=HAEUSER[hk];const S=T[H.sprache];const m=plus(heuteIso(),1);const z=aufgaben(hk,m);
   return{title:S.morgen+' · '+S.wt[new Date(m+'T12:00:00Z').getUTCDay()]+' '+m.slice(8)+'.'+m.slice(5,7)+'. · '+H.name,body:z.length?z.join('\n'):S.nichtsZuTun,url:SEITE+hk+'/',leer:!z.length}}
@@ -168,10 +184,10 @@ function doPost(e){let x={};try{x=JSON.parse(e.postData.contents)}catch(err){ret
   if(x.typ==='abo'){if(!HAEUSER[x.haus]||!x.sub||!/^https:\/\//.test(x.sub.endpoint||''))return json({fehler:'abo'});
     const sh=blatt('Abos');const v=sh.getDataRange().getValues();if(!v.some(r=>r[0]===x.sub.endpoint))sh.appendRow([x.sub.endpoint,x.haus,new Date().toISOString()]);return json({ok:true})}
   if(x.typ==='abmelden'){const sh=blatt('Abos');const v=sh.getDataRange().getValues();for(let i=v.length-1;i>=1;i--)if(v[i][0]===x.endpoint)sh.deleteRow(i+1);return json({ok:true})}
-  if(!adminOk(x.pw))return json({fehler:'passwort'});
+  if(!adminOk(x))return json({fehler:'passwort'});
   if(x.typ==='login')return json({ok:true});
   if(x.typ==='liste'){const ab=plus(heuteIso(),-14);return json({ok:true,heute:heuteIso(),haeuser:Object.keys(HAEUSER).map(k=>({id:k,name:HAEUSER[k].name,wgs:HAEUSER[k].wgs,namen:HAEUSER[k].namen})),
-    buchungen:buchungenLesen().filter(b=>b.status!=='storniert'&&(b.abreise||b.anreise)>=ab)})}
+    buchungen:ergaenzen(buchungenLesen()).filter(b=>b.status!=='storniert'&&(b.abreise||b.anreise)>=ab)})}
   /* Veröffentlichen: alle Änderungen der Admin-Seite auf einmal – danach EINMAL die Tabellen neu schreiben.
      Jede Änderung: {id, felder}; eine neue Buchung kommt mit id 'neu…'. */
   if(x.typ==='veroeffentlichen'){const lock=LockService.getScriptLock();lock.waitLock(20000);
@@ -182,22 +198,27 @@ function doPost(e){let x={};try{x=JSON.parse(e.postData.contents)}catch(err){ret
           if(k==='haus'&&!HAEUSER[v])continue;if((k==='anreise'||k==='abreise')&&v&&!/^\d{4}-\d{2}-\d{2}$/.test(v))continue;
           if(k==='wg'||k==='gaeste')v=v===''||v==null?'':Math.max(0,Math.min(40,parseInt(v,10)||0))||'';if(k==='status'&&v!=='storniert')v='bestaetigt';
           if(k==='gast')v=String(v||'').slice(0,80);b[k]=v}
-        b.admin=jetzt;b.geaendert=jetzt;fertig.push({vorher:a.id,buchung:b})}
+        b.admin=jetzt;b.geaendert=jetzt;b.pruefen='';fertig.push({vorher:a.id,buchung:b})}
       buchungenSchreiben(L);oeffentlichSchreiben(L);return json({ok:true,fertig})}
     finally{lock.releaseLock()}}
   if(x.typ==='abgleich'){abgleich(7);return json({ok:true})}
   return json({fehler:'typ'})}
-function adminOk(pw){const c=CacheService.getScriptCache();const f=+(c.get('fehlversuche')||0);if(f>=10)return false;
-  const soll=PropertiesService.getScriptProperties().getProperty('ADMIN_PW')||'';const ist=String(pw||'');
-  let d=soll.length^ist.length;for(let i=0;i<soll.length;i++)d|=soll.charCodeAt(i)^(ist.charCodeAt(i)||0);
-  if(d!==0||!soll){c.put('fehlversuche',String(f+1),600);return false}return true}
+const gleich=(a,b)=>{a=String(a||'');b=String(b||'');let d=a.length^b.length;for(let i=0;i<a.length;i++)d|=a.charCodeAt(i)^(b.charCodeAt(i)||0);return d===0&&a.length>0};
+/* Nur EIN Admin: Die PIN steht im privaten Blatt „Info“ der Verwaltungstabelle (Zeile „Admin-PIN“) – niemand kann sie über
+   die Seite festlegen. Nach 5 Fehlversuchen 1 Stunde gesperrt. Das Admin-Passwort aus „Info“ geht weiterhin. */
+function adminPin(){const c=CacheService.getScriptCache();let p=c.get('adminPin');
+  if(p==null){const v=blatt('Info').getDataRange().getDisplayValues();const z=v.find(r=>r[0]==='Admin-PIN');p=z?String(z[1]).trim():'';c.put('adminPin',p,600)}return p}
+function adminOk(x){const c=CacheService.getScriptCache();const f=+(c.get('fehlversuche')||0);if(f>=5)return false;
+  let ok=false;if(x.pin)ok=gleich(String(x.pin),adminPin());
+  if(!ok&&x.pw)ok=gleich(String(x.pw),PropertiesService.getScriptProperties().getProperty('ADMIN_PW'));
+  if(!ok&&(x.pin||x.pw))c.put('fehlversuche',String(f+1),3600);return ok}
 
 /* ---------- Einmal ausführen: Schlüssel, Passwort, Zeitpläne, erster großer Abgleich ---------- */
 function einrichten(){const P=PropertiesService.getScriptProperties();
   if(!P.getProperty('VAPID_D')){const k=vapidSchluessel();P.setProperty('VAPID_D',k.d);P.setProperty('VAPID_PUB',k.pub)}
   if(!P.getProperty('ADMIN_PW')){const a='abcdefghjkmnpqrstuvwxyz23456789';const h=sha256(bytes(Utilities.getUuid()+Utilities.getUuid()+Date.now()));
     P.setProperty('ADMIN_PW',h.slice(0,10).map(x=>a[x%a.length]).join(''))}
-  const info=blatt('Info');info.clear();info.getRange(1,1,3,2).setValues([['Admin-Passwort',P.getProperty('ADMIN_PW')],['Push-Schlüssel (öffentlich)',P.getProperty('VAPID_PUB')],['Eingerichtet',new Date().toISOString()]]);
+  const info=blatt('Info');info.getRange(1,1,3,2).setValues([['Admin-Passwort',P.getProperty('ADMIN_PW')],['Push-Schlüssel (öffentlich)',P.getProperty('VAPID_PUB')],['Eingerichtet',new Date().toISOString()]]);
   ScriptApp.getProjectTriggers().forEach(t=>ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('abgleich').timeBased().everyMinutes(5).create();
   ScriptApp.newTrigger('abendPush').timeBased().atHour(18).everyDays(1).inTimezone('Europe/Berlin').create();

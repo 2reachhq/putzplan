@@ -4,108 +4,148 @@
 <title>Putzplan – Admin</title><link rel="icon" href="../icons/favicon-32.png" sizes="32x32"><link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
 <link rel="stylesheet" href="../plan.css">
 <style>
-main{padding-bottom:110px}
-.anmelden{background:#fff;border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:10px}
-.anmelden input,.feld input,.feld select{font:inherit;font-size:16px;padding:10px 12px;border:1px solid #D6D6D6;border-radius:10px;background:#fff;color:#161616;width:100%;box-sizing:border-box;min-width:0;max-width:100%}
-.knopf{font:inherit;font-size:16px;font-weight:600;padding:11px 16px;border-radius:12px;border:0;background:#161616;color:#fff;cursor:pointer}
-.knopf.hell{background:#fff;color:#161616;border:1px solid #E2E2E2}
+main{padding-bottom:120px}
+.box{background:#fff;border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.box input,.feld input,.feld select{font:inherit;font-size:16px;padding:11px 12px;border:1px solid #D6D6D6;border-radius:10px;background:#fff;color:#161616;width:100%;box-sizing:border-box;min-width:0;max-width:100%}
+.pin{letter-spacing:.3em;text-align:center;font-size:24px!important}
+.knopf{font:inherit;font-size:16px;font-weight:600;padding:12px 16px;border-radius:12px;border:0;background:#161616;color:#fff;cursor:pointer}
+.knopf.hell{background:#fff;color:#161616;border:1px solid #E2E2E2}.knopf.rot{background:#fff;color:#D93636;border:1px solid #F0C4C4}
 .knopf:disabled{opacity:.4}
-.leiste{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
-.bu{background:#fff;border-radius:14px;padding:12px 14px;margin:0 0 10px;border:2px solid transparent}
-.bu.fehlt{border-color:#D93636}.bu.geaendert{border-color:#EE7310;background:#FFF8F1}.bu.storno{opacity:.5}
-.kopf2{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.kopf2 b{font-size:20px}.klein{font-size:12px;color:#777}
-.wo{font-size:16px;font-weight:600;margin-top:2px}
-.raster{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
-.raster .breit{grid-column:1/-1}
-.feld{display:flex;flex-direction:column;gap:3px;font-size:12px;color:#666;min-width:0}
-.feld.rot input,.feld.rot select{border-color:#D93636;background:#FFF5F5}
-.zeile{display:flex;justify-content:flex-end;margin-top:8px}
-.link{font:inherit;font-size:12px;color:#777;background:none;border:0;text-decoration:underline;cursor:pointer;padding:4px}
-.abschnitt{font-size:12px;font-weight:700;color:#777;text-transform:uppercase;letter-spacing:.04em;margin:16px 4px 8px}
-.abschnitt.rot{color:#D93636}
-.unten{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:rgba(242,242,242,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-top:1px solid #E2E2E2}
+.fehler{color:#D93636;font-size:16px}
+.leiste{display:flex;gap:8px;margin:0 0 12px}.leiste .knopf{flex:1;font-size:12px;padding:9px 8px}
+.haus{font-size:24px;font-weight:800;margin:6px 4px 8px;letter-spacing:-.01em}
+.adm .lab{flex-basis:88px;width:88px;flex-direction:column;align-items:flex-start;justify-content:center;padding:0 8px;gap:1px}
+.adm .lab b{font-size:16px}.adm .lab small{font-size:12px;font-weight:500;color:#8A8A8A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:72px}
+.adm .ecke{align-items:center}
+.adm .trk{cursor:pointer}
+.bk{cursor:pointer}.bk.pruefen{background:#EE7310}.bk.offen{box-shadow:0 0 0 3px #161616}
+.abschnitt{font-size:12px;font-weight:700;color:#777;text-transform:uppercase;letter-spacing:.04em;margin:18px 4px 8px}.abschnitt.rot{color:#D93636}
+.zeile{background:#fff;border-radius:14px;padding:12px 14px;margin:0 0 8px;display:flex;justify-content:space-between;gap:10px;align-items:center;cursor:pointer;border:2px solid transparent}
+.zeile.rot{border-color:#D93636}.zeile.orange{border-color:#EE7310}
+.zeile b{font-size:16px}.klein{font-size:12px;color:#777}
+.unten{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:rgba(242,242,242,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-top:1px solid #E2E2E2;z-index:5}
 .unten .innen{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:6px}
 .unten .knopf{width:100%;padding:14px;background:#EE7310}
 .meldung{font-size:12px;color:#2B8C78;text-align:center;min-height:15px}
+/* Blatt von unten */
+.blatt{border:0;padding:0;margin:auto auto 0;width:100%;max-width:560px;border-radius:22px 22px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.2);color:#161616}
+.blatt::backdrop{background:rgba(0,0,0,.35)}
+.blatt[open]{animation:hoch .2s ease-out}@keyframes hoch{from{transform:translateY(30px);opacity:.6}to{transform:none;opacity:1}}
+.blatt .in{padding:18px 16px calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px}
+.blatt h2{margin:0;font-size:24px}.blatt .unter{font-size:12px;color:#777;margin-top:-8px}
+.raster{display:grid;grid-template-columns:1fr 1fr;gap:10px}.raster .breit{grid-column:1/-1}
+.feld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#666;min-width:0}
+.feld.rot input{border-color:#D93636;background:#FFF5F5}
+.knoepfe{display:flex;gap:8px}.knoepfe .knopf{flex:1}
 </style></head>
-<body><header><div class="kz"><div><span class="ort">Admin</span><h1>Buchungen</h1></div><div class="st"><span>Kranzstraße 9</span><b>Poetherweg 17</b></div></div></header>
+<body><header><div class="kz"><div><span class="ort">Admin</span><h1>Buchungen</h1></div><div class="st"><span>Stand</span><b id="stand"></b></div></div></header>
 <main id="app"><div class="hinweis">…</div></main>
 <div class="unten" id="unten" hidden><div class="innen"><div class="meldung" id="meldung"></div><button class="knopf" id="pub" disabled>Veröffentlichen</button></div></div>
+<dialog class="blatt" id="blatt"><form class="in" id="blattForm" method="dialog"></form></dialog>
 <script src="../dienst.js"></script>
 <script>
-/* Admin: alle Buchungen beider Häuser in EINER Liste. Fehlende Angaben (Abreise, Gäste, Wohnung) eintragen, Name ergänzen,
-   stornieren oder neu anlegen – die Änderungen werden erst gesammelt und mit „Veröffentlichen“ auf einmal an den Dienst
-   geschickt. Der schreibt dann die Tabellen neu: Putzplan-Seiten, Push und die Buchhaltungs-App übernehmen es von dort. */
+/* Admin (nur für den Betreiber): beide Häuser als Kalender. Buchung antippen → ändern/verlängern/stornieren; leeren Tag
+   antippen → blockieren (Personen, bis wann). Alles wird gesammelt und erst mit „Veröffentlichen“ an den Dienst geschickt,
+   der dann Putzplan-Seiten, Push und die Buchhaltungs-App aktualisiert. Anmeldung mit der PIN aus dem privaten Blatt „Info“ (nur ein Admin). */
 (function(){
-  const D=self.DIENST;const app=document.getElementById('app');const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  let pw='';try{pw=localStorage.getItem('putzplan.admin')||''}catch(e){}
-  let daten=null;const offen=new Map();let neuNr=0;
-  const dienst=o=>fetch(D,{method:'POST',body:JSON.stringify({...o,pw})}).then(r=>r.json());
-  const WT=['So','Mo','Di','Mi','Do','Fr','Sa'];
+  const D=self.DIENST;const app=document.getElementById('app');const W=44,LAB=88;
+  const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  let pin='';try{pin=localStorage.getItem('putzplan.pin')||''}catch(e){}
+  let daten=null;const offen=new Map();let neuNr=0,scrollX=null;
+  const dienst=o=>fetch(D,{method:'POST',body:JSON.stringify({...o,pin})}).then(r=>r.json());
+  const WT=['So','Mo','Di','Mi','Do','Fr','Sa'],MON=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+  const plus=(s,n)=>{const d=new Date(s+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
+  const tage=(a,b)=>Math.round((Date.parse(b+'T12:00:00Z')-Date.parse(a+'T12:00:00Z'))/864e5);
   const dat=s=>s?WT[new Date(s+'T12:00:00Z').getUTCDay()]+' '+s.slice(8)+'.'+s.slice(5,7)+'.':'?';
   const unten=document.getElementById('unten'),pub=document.getElementById('pub'),meld=document.getElementById('meldung');
+  const blatt=document.getElementById('blatt'),bf=document.getElementById('blattForm');
   if(!D){app.innerHTML='<div class="hinweis">Der Dienst ist noch nicht eingerichtet.</div>';return}
 
-  function anmelden(fehler){unten.hidden=true;app.innerHTML='<form class="anmelden" id="f"><b>Anmelden</b><input type="password" id="pw" placeholder="Passwort" autocomplete="current-password" required>'
-    +(fehler?'<div style="color:#D93636;font-size:16px">'+esc(fehler)+'</div>':'')+'<button class="knopf">Weiter</button></form>';
-    document.getElementById('f').onsubmit=async e=>{e.preventDefault();pw=document.getElementById('pw').value.trim();
-      const r=await dienst({typ:'login'}).catch(()=>null);if(r&&r.ok){try{localStorage.setItem('putzplan.admin',pw)}catch(e){}laden()}else anmelden(r?'Passwort falsch (nach 10 Fehlversuchen 10 Minuten gesperrt).':'Keine Verbindung.')}}
+  /* ---------- Anmeldung mit PIN ---------- */
+  function anmelden(fehler){unten.hidden=true;
+    app.innerHTML='<form class="box" id="f"><b>Anmelden</b><input class="pin" type="password" inputmode="numeric" pattern="[0-9]*" id="p1" placeholder="PIN" autocomplete="current-password" required>'
+      +(fehler?'<div class="fehler">'+esc(fehler)+'</div>':'')+'<button class="knopf">Weiter</button></form>';
+    document.getElementById('f').onsubmit=async e=>{e.preventDefault();pin=document.getElementById('p1').value.trim();
+      const r=await dienst({typ:'login'}).catch(()=>null);if(r&&r.ok){try{localStorage.setItem('putzplan.pin',pin)}catch(e){}laden()}else anmelden(r?'PIN falsch (nach 5 Fehlversuchen 1 Stunde gesperrt).':'Keine Verbindung.')}}
 
-  async function laden(){const r=await dienst({typ:'liste'}).catch(()=>null);if(!r||!r.ok){anmelden(r&&r.fehler==='passwort'?'Bitte anmelden.':'Keine Verbindung.');return}
-    daten=r;offen.clear();unten.hidden=false;zeigen()}
+  async function laden(){const r=await dienst({typ:'liste'}).catch(()=>null);if(!r||!r.ok){anmelden(r&&r.fehler==='passwort'?'':'Keine Verbindung.');return}
+    daten=r;offen.clear();unten.hidden=false;zeigen();document.getElementById('stand').textContent=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}
 
-  /* aktueller Stand einer Buchung = Server + noch nicht veröffentlichte Änderungen */
+  /* ---------- Stand = Server + noch nicht veröffentlichte Änderungen ---------- */
   const stand=b=>({...b,...((offen.get(b.id)||{}).felder||{})});
+  const alle=()=>daten.buchungen.map(stand).filter(b=>b.status!=='storniert'||offen.has(b.id));
   const fehlt=b=>b.status!=='storniert'&&(!b.gaeste||!b.abreise||!b.wg||!b.haus)&&(b.abreise||b.anreise||'9')>=daten.heute;
-  const wohnungen=()=>daten.haeuser.flatMap(h=>h.wgs.map(w=>({wert:h.id+'|'+w,text:h.name.replace(/ \d+$/,'')+' · WG '+w+' – '+((h.namen||{})[w]||'')})));
-  const wohnText=b=>{const h=daten.haeuser.find(x=>x.id===b.haus);return h?h.name+' · WG '+(b.wg||'?')+(b.wg&&(h.namen||{})[b.wg]?' – '+h.namen[b.wg]:''):'Haus unbekannt'};
+  const hausVon=id=>daten.haeuser.find(h=>h.id===id);
 
-  function karte(b0){const b=stand(b0);const f=fehlt(b);const g=offen.has(b.id);
-    const sel='<select data-k="wohnung"><option value="">– Wohnung wählen –</option>'+wohnungen().map(o=>'<option value="'+o.wert+'"'+(o.wert===b.haus+'|'+b.wg?' selected':'')+'>'+esc(o.text)+'</option>').join('')+'</select>';
-    return '<div class="bu'+(g?' geaendert':f?' fehlt':'')+(b.status==='storniert'?' storno':'')+'" data-id="'+esc(b.id)+'">'
-      +'<div class="kopf2"><b>'+dat(b.anreise)+' → '+dat(b.abreise)+'</b><span class="klein">'+esc(b.quelle==='airbnb'?'Airbnb':b.quelle==='booking'?'Booking':'Direkt')+(b.status==='storniert'?' · wird storniert':'')+'</span></div>'
-      +'<div class="wo">'+esc(wohnText(b))+'</div><div class="klein">'+esc(b.gast||'Name fehlt')+(b.code?' · '+esc(b.code):'')+'</div>'
-      +'<div class="raster"><label class="feld breit'+(!b.wg||!b.haus?' rot':'')+'">Wohnung'+sel+'</label>'
-      +'<label class="feld">Anreise<input type="date" data-k="anreise" value="'+esc(b.anreise)+'"></label>'
-      +'<label class="feld'+(!b.abreise?' rot':'')+'">Abreise (bis wann)<input type="date" data-k="abreise" value="'+esc(b.abreise)+'"></label>'
-      +'<label class="feld'+(!b.gaeste?' rot':'')+'">Personen<input type="number" inputmode="numeric" min="1" max="20" data-k="gaeste" value="'+esc(b.gaeste)+'"></label>'
-      +'<label class="feld">Name<input type="text" data-k="gast" value="'+esc(b.gast)+'"></label></div>'
-      +'<div class="zeile"><button class="link" data-a="storno">'+(b.status==='storniert'?'doch nicht stornieren':'Stornieren')+'</button></div></div>'}
+  function kalender(h,von,N){const heute=daten.heute;const L=alle().filter(b=>b.haus===h.id&&b.status!=='storniert');
+    let kopf='';for(let i=0;i<N;i++){const d=plus(von,i);const dt=new Date(d+'T12:00:00Z');
+      kopf+='<div class="kt'+(d===heute?' heute':'')+(d<heute?' vorbei':'')+'" style="left:'+(i*W)+'px">'+((dt.getUTCDate()===1||i===0)?'<span class="mo">'+MON[dt.getUTCMonth()]+'</span>':'')
+        +'<span class="wd">'+WT[dt.getUTCDay()]+'</span><span class="nr">'+dt.getUTCDate()+'</span></div>'}
+    let z='';for(const w of h.wgs){let bars='';
+      for(const b of L.filter(x=>+x.wg===+w&&x.anreise)){const ab=b.abreise||plus(b.anreise,1);if(ab<von||b.anreise>plus(von,N-1))continue;
+        const x=(tage(von,b.anreise)+.5)*W+2,wd=tage(b.anreise,ab)*W-4;const cls=fehlt(b)?' rot':b.pruefen?' pruefen':'';
+        bars+='<div class="bk'+cls+(offen.has(b.id)?' offen':'')+(ab<=heute?' vorbei':'')+'" data-id="'+esc(b.id)+'" style="left:'+x+'px;width:'+wd+'px"><b>'+(b.gaeste?esc(b.gaeste):'?')+'</b></div>'}
+      z+='<div class="r"><div class="lab"><b>'+w+'</b><small>'+esc((h.namen||{})[w]||'')+'</small></div><div class="trk" data-haus="'+h.id+'" data-wg="'+w+'" style="width:'+(N*W)+'px">'+bars+'</div></div>'}
+    const ti=tage(von,heute);
+    return '<div class="haus">'+esc(h.name)+'</div><div class="karte adm"><div class="kal"><div class="kin" style="width:'+(LAB+N*W)+'px">'
+      +(ti>=0&&ti<N?'<div class="sp heute" style="left:'+(LAB+ti*W)+'px"></div>':'')
+      +'<div class="r kopf"><div class="lab ecke"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#2B8C78" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg></div><div class="trk" style="width:'+(N*W)+'px;cursor:default">'+kopf+'</div></div>'
+      +z+'</div></div></div>'}
 
-  function zaehler(){pub.disabled=!offen.size;pub.textContent=offen.size?'Veröffentlichen ('+offen.size+')':'Veröffentlichen'}
-  function zeigen(){const L=daten.buchungen.filter(b=>stand(b).status!=='storniert'||offen.has(b.id)).slice().sort((a,b)=>(stand(a).anreise||'').localeCompare(stand(b).anreise||''));const heute=daten.heute;
-    const kommend=L.filter(b=>(stand(b).abreise||stand(b).anreise||'9')>=heute),vorbei=L.filter(b=>(stand(b).abreise||stand(b).anreise||'9')<heute);
-    const rot=kommend.filter(b=>fehlt(stand(b))&&!offen.has(b.id)),rest=kommend.filter(b=>!rot.includes(b));
-    app.innerHTML='<div class="leiste"><button class="knopf hell" data-a="neu">+ Neue Buchung</button><button class="knopf hell" data-a="abgleich">Gmail jetzt abgleichen</button><button class="knopf hell" data-a="abmelden">Abmelden</button></div>'
-      +(rot.length?'<div class="abschnitt rot">Fehlt etwas ('+rot.length+')</div>'+rot.map(karte).join(''):'')
-      +'<div class="abschnitt">Kommend – beide Häuser</div>'+(rest.map(karte).join('')||'<div class="hinweis">Keine.</div>')
-      +(vorbei.length?'<div class="abschnitt">Letzte 14 Tage</div>'+vorbei.reverse().map(karte).join(''):'');
+  function zeigen(){const heute=daten.heute;const von=plus(heute,-7);
+    const letzte=alle().reduce((m,b)=>{const x=b.abreise||b.anreise||'';return x>m?x:m},plus(heute,60));const N=Math.min(tage(von,letzte)+3,420);
+    const L=alle().filter(b=>b.status!=='storniert'&&(b.abreise||b.anreise||'9')>=heute).sort((a,b)=>(a.anreise||'').localeCompare(b.anreise||''));
+    const rot=L.filter(fehlt),orange=L.filter(b=>!fehlt(b)&&b.pruefen);
+    const zeile=(b,k)=>{const h=hausVon(b.haus);return '<div class="zeile '+k+'" data-id="'+esc(b.id)+'"><div><b>'+dat(b.anreise)+' → '+dat(b.abreise)+'</b><div class="klein">'+esc(h?h.name.replace(/ \d+$/,''):'?')+' · WG '+esc(b.wg||'?')+' · '+esc(b.gast||'ohne Name')+'</div></div><span class="klein">'+(k==='rot'?'fehlt':'geändert')+' ›</span></div>'};
+    app.innerHTML='<div class="leiste"><button class="knopf hell" data-a="abgleich">Gmail jetzt abgleichen</button><button class="knopf hell" data-a="abmelden">Abmelden</button></div>'
+      +daten.haeuser.map(h=>kalender(h,von,N)).join('')
+      +'<div class="legende"><span><i style="background:#2B8C78"></i>Personen</span><span><i style="background:#D93636"></i>fehlt</span><span><i style="background:#EE7310"></i>geändert</span></div>'
+      +'<div class="klein" style="margin:8px 4px">Buchung antippen = ändern oder verlängern. Leeren Tag antippen = blockieren.</div>'
+      +(rot.length?'<div class="abschnitt rot">Fehlt etwas ('+rot.length+')</div>'+rot.map(b=>zeile(b,'rot')).join(''):'')
+      +(orange.length?'<div class="abschnitt" style="color:#EE7310">Geändert – bitte Daten prüfen ('+orange.length+')</div>'+orange.map(b=>zeile(b,'orange')).join(''):'');
+    const kals=[...app.querySelectorAll('.kal')];const start=scrollX!=null?scrollX:6*W;
+    kals.forEach(k=>{k.scrollLeft=start;k.addEventListener('scroll',()=>{scrollX=k.scrollLeft;kals.forEach(o=>{if(o!==k&&Math.abs(o.scrollLeft-k.scrollLeft)>1)o.scrollLeft=k.scrollLeft})},{passive:true})});
     zaehler()}
+  function zaehler(){pub.disabled=!offen.size;pub.textContent=offen.size?'Veröffentlichen ('+offen.size+')':'Veröffentlichen'}
 
-  function merken(karteEl){const id=karteEl.dataset.id;const b=daten.buchungen.find(x=>x.id===id);const o=offen.get(id)||{id,felder:{}};
-    karteEl.querySelectorAll('[data-k]').forEach(i=>{if(i.dataset.k==='wohnung'){const[h,w]=(i.value||'|').split('|');o.felder.haus=h||'';o.felder.wg=w||''}else o.felder[i.dataset.k]=i.value});
-    /* nur echte Unterschiede zählen */
-    for(const k of Object.keys(o.felder))if(String(o.felder[k]??'')===String(b[k]??''))delete o.felder[k];
-    if(Object.keys(o.felder).length||/^neu/.test(id))offen.set(id,o);else offen.delete(id);
-    karteEl.classList.toggle('geaendert',offen.has(id));zaehler();meld.textContent=''}
+  /* ---------- Blatt: Buchung ändern oder Tag blockieren ---------- */
+  function oeffnen(id,vorgabe){const neu=!id;const b=neu?{id:'neu'+(++neuNr),quelle:'direkt',status:'bestaetigt',...vorgabe}:stand(daten.buchungen.find(x=>x.id===id));
+    const h=hausVon(b.haus);const wohn=daten.haeuser.flatMap(x=>x.wgs.map(w=>({v:x.id+'|'+w,t:x.name.replace(/ \d+$/,'')+' · WG '+w+' – '+((x.namen||{})[w]||'')})));
+    bf.innerHTML='<h2>'+(neu?'Blockieren':esc(b.gast||'Buchung'))+'</h2><div class="unter">'+(neu?esc(h?h.name:''):esc(b.quelle==='airbnb'?'Airbnb':b.quelle==='booking'?'Booking':'Direkt')+(b.code?' · '+esc(b.code):'')+(b.pruefen?' · geändert – bitte prüfen':''))+'</div>'
+      +'<div class="raster"><label class="feld breit">Wohnung<select name="wohnung">'+wohn.map(o=>'<option value="'+o.v+'"'+(o.v===b.haus+'|'+b.wg?' selected':'')+'>'+esc(o.t)+'</option>').join('')+'</select></label>'
+      +'<label class="feld">'+(neu?'Ab':'Anreise')+'<input type="date" name="anreise" value="'+esc(b.anreise)+'" required></label>'
+      +'<label class="feld'+(!b.abreise?' rot':'')+'">Bis wann<input type="date" name="abreise" value="'+esc(b.abreise)+'"></label>'
+      +'<label class="feld'+(!b.gaeste?' rot':'')+'">Personen<input type="number" inputmode="numeric" min="1" max="20" name="gaeste" value="'+esc(b.gaeste)+'"></label>'
+      +'<label class="feld">Name<input type="text" name="gast" value="'+esc(b.gast)+'" placeholder="'+(neu?'Blockiert':'')+'"></label></div>'
+      +'<div class="knoepfe"><button class="knopf hell" type="button" id="bZu">Abbrechen</button><button class="knopf" value="ok" id="bOk">Übernehmen</button></div>'
+      +(neu?'':'<button class="knopf rot" type="button" id="bStorno">Buchung stornieren</button>');
+    bf.querySelector('#bZu').onclick=()=>blatt.close();
+    const nehmen=status=>{const f=new FormData(bf);const[hh,ww]=String(f.get('wohnung')||'|').split('|');
+      const felder={haus:hh,wg:ww,anreise:f.get('anreise')||'',abreise:f.get('abreise')||'',gaeste:f.get('gaeste')||'',gast:f.get('gast')||(neu?'Blockiert':'')};
+      if(felder.abreise&&felder.anreise&&felder.abreise<=felder.anreise){alert('„Bis wann“ muss nach dem Anfang liegen.');return false}
+      if(status)felder.status=status;
+      if(neu){daten.buchungen.push({id:b.id,quelle:'direkt',status:'bestaetigt'});offen.set(b.id,{id:b.id,felder})}
+      else{const alt=daten.buchungen.find(x=>x.id===id);const o=offen.get(id)||{id,felder:{}};Object.assign(o.felder,felder);
+        for(const k of Object.keys(o.felder))if(String(o.felder[k]??'')===String(alt[k]??''))delete o.felder[k];
+        if(Object.keys(o.felder).length)offen.set(id,o);else offen.delete(id)}
+      blatt.close();meld.textContent='';zeigen();return true};
+    bf.onsubmit=e=>{e.preventDefault();nehmen()};
+    const st=bf.querySelector('#bStorno');if(st)st.onclick=()=>{if(confirm('Diese Buchung stornieren? Sie verschwindet nach dem Veröffentlichen überall.'))nehmen('storniert')};
+    blatt.showModal()}
 
-  app.addEventListener('change',e=>{const k=e.target.closest('.bu');if(k)merken(k)});
-  app.addEventListener('input',e=>{const k=e.target.closest('.bu');if(k&&e.target.dataset.k!=='wohnung')merken(k)});
-  app.addEventListener('click',async e=>{const t=e.target.closest('[data-a]');if(!t)return;const a=t.dataset.a;
-    if(a==='abmelden'){if(offen.size&&!confirm('Nicht veröffentlichte Änderungen gehen verloren. Trotzdem abmelden?'))return;pw='';try{localStorage.removeItem('putzplan.admin')}catch(err){}anmelden();return}
-    if(a==='abgleich'){if(offen.size&&!confirm('Nicht veröffentlichte Änderungen gehen verloren. Trotzdem neu laden?'))return;t.disabled=true;t.textContent='Gmail wird gelesen …';await dienst({typ:'abgleich'}).catch(()=>null);await laden();return}
-    if(a==='neu'){const id='neu'+(++neuNr);daten.buchungen.push({id,quelle:'direkt',status:'bestaetigt',haus:'',wg:'',anreise:daten.heute,abreise:'',gaeste:'',gast:''});
-      offen.set(id,{id,felder:{anreise:daten.heute}});zeigen();const el=app.querySelector('[data-id="'+id+'"]');if(el)el.scrollIntoView({block:'center'});return}
-    if(a==='storno'){const k=t.closest('.bu');const id=k.dataset.id;const b=stand(daten.buchungen.find(x=>x.id===id));const o=offen.get(id)||{id,felder:{}};
-      o.felder.status=b.status==='storniert'?'bestaetigt':'storniert';offen.set(id,o);zeigen();return}});
+  app.addEventListener('click',async e=>{const a=e.target.closest('[data-a]');
+    if(a){if(a.dataset.a==='abmelden'){if(offen.size&&!confirm('Nicht veröffentlichte Änderungen gehen verloren. Trotzdem abmelden?'))return;pin='';try{localStorage.removeItem('putzplan.pin')}catch(err){}anmelden();return}
+      if(a.dataset.a==='abgleich'){if(offen.size&&!confirm('Nicht veröffentlichte Änderungen gehen verloren. Trotzdem neu laden?'))return;a.disabled=true;a.textContent='Gmail wird gelesen …';await dienst({typ:'abgleich'}).catch(()=>null);await laden();return}}
+    const bar=e.target.closest('.bk[data-id],.zeile[data-id]');if(bar){oeffnen(bar.dataset.id);return}
+    const t=e.target.closest('.trk[data-wg]');if(t){const r=t.getBoundingClientRect();const i=Math.floor((e.clientX-r.left)/W);const d=plus(plus(daten.heute,-7),i);
+      oeffnen(null,{haus:t.dataset.haus,wg:t.dataset.wg,anreise:d,abreise:plus(d,1),gaeste:2,gast:''})}});
+  blatt.addEventListener('click',e=>{if(e.target===blatt)blatt.close()});
 
   pub.addEventListener('click',async()=>{if(!offen.size)return;pub.disabled=true;pub.textContent='Wird veröffentlicht …';meld.style.color='';
     const r=await dienst({typ:'veroeffentlichen',aenderungen:[...offen.values()]}).catch(()=>null);
     if(r&&r.ok){const n=offen.size;await laden();meld.textContent=n+' Änderung'+(n===1?'':'en')+' veröffentlicht – Putzplan und App sind aktualisiert.'}
     else{meld.style.color='#D93636';meld.textContent='Veröffentlichen ging nicht'+(r&&r.fehler?' ('+r.fehler+')':'')+'. Bitte nochmal.';zaehler()}});
-
   addEventListener('beforeunload',e=>{if(offen.size){e.preventDefault();e.returnValue=''}});
-  pw?laden():anmelden();
+  pin?laden():anmelden();
 })();
 </script></body></html>
