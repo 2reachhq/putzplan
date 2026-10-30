@@ -56,7 +56,8 @@ function zuordnen(x){const s=String(x||'').trim();if(!s)return null;if(INSERATE[
 /* ---------- Mails lesen (gleiche Leser wie in der Buchhaltungs-App) ---------- */
 function leseAirbnb(m){const s=String(m.subject||''),t=String(m.text||'').replace(/\r/g,'');
   const st=/^Storniert: Buchung ([A-Z0-9]{8,})/.exec(s);if(st)return{id:'ab-'+st[1],quelle:'airbnb',code:st[1],status:'storniert'};
-  if(/Buchung aktualisiert/i.test(s)){const c=(/details\/([A-Z0-9]{8,})/.exec(t)||[])[1];return c?{id:'ab-'+c,quelle:'airbnb',code:c,pruefen:true}:null}
+  /* Gast hat die Buchung geändert („Buchung aktualisiert“ oder „Deine Buchungsänderung wurde bestätigt“): Daten stehen nicht in der Mail → gelb, bitte prüfen */
+  if(/Buchung aktualisiert|Buchungsänderung wurde bestätigt/i.test(s)){const c=(/details\/([A-Z0-9]{8,})/.exec(t)||[])[1];return c?{id:'ab-'+c,quelle:'airbnb',code:c,pruefen:true}:null}
   if(!/Buchung bestätigt/i.test(s))return null;const code=(/BESTÄTIGUNGS-CODE\s*\n\s*([A-Z0-9]{8,})/.exec(t)||/details\/([A-Z0-9]{8,})/.exec(t)||[])[1];if(!code)return null;
   const gast=((/Buchung bestätigt\s*[–-]\s*(.+?)\s+kommt am/i.exec(s)||[])[1]||'').trim();const ref=m.datum||Date.now();
   const ci=/Check-in\s+Check-out\s*\n+\s*([^\n]+)/.exec(t);const tage=ci?[...ci[1].matchAll(/\d{1,2}\.\s*[A-Za-zÄäö]{3}/g)].map(x=>tagOhneJahr(x[0],ref)):[];
@@ -102,7 +103,7 @@ function zusammen(L,x){let b=L.find(o=>o.id===x.id);const neu=!b;if(neu){b={id:x
 function abgleich(tage){const lock=LockService.getScriptLock();if(!lock.tryLock(20000))return;
   try{const sh=blatt('Gesehen');const gesehen=new Set(sh.getRange('A:A').getValues().map(r=>String(r[0])).filter(Boolean));const neuGesehen=[];
     const L=buchungenLesen();let n=0;const t=tage||3;
-    const Q=[['ab','from:automated@airbnb.com (subject:"Buchung bestätigt" OR subject:"Storniert: Buchung" OR subject:"Buchung aktualisiert") newer_than:'+t+'d'],
+    const Q=[['ab','from:automated@airbnb.com (subject:"Buchung bestätigt" OR subject:"Storniert: Buchung" OR subject:"Buchung aktualisiert" OR subject:"Buchungsänderung wurde bestätigt") newer_than:'+t+'d'],
       ['bk','from:noreply@booking.com (subject:"neue Buchung" OR subject:"Last-Minute-Buchung" OR subject:storniert OR subject:geändert) newer_than:'+t+'d'],
       ['bn','from:guest.booking.com newer_than:'+t+'d']];
     const neu=[];const geaendert=[];
