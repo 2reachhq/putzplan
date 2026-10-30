@@ -92,7 +92,7 @@ main{padding-bottom:120px}
       kopf+='<div class="mseg'+(i?'':' erst')+'" style="left:'+(i*W)+'px;width:'+(n*W)+'px"><span class="mo">'+String(dt.getUTCMonth()+1).padStart(2,'0')+'/'+dt.getUTCFullYear()+'</span></div>';i+=n}
     let z='';for(const w of h.wgs){let bars='';
       for(const b of L.filter(x=>+x.wg===+w&&x.anreise)){const ab=b.abreise||plus(b.anreise,1);if(ab<von||b.anreise>plus(von,N-1))continue;
-        const x=(tage(von,b.anreise)+.5)*W+5,wd=tage(b.anreise,ab)*W-10;const cls=b.pruefen?' pruefen':fehlt(b)?' rot':'';/* gelb vor rot: der Gast hat geändert, die Mail nennt die neuen Daten nicht */
+        const x=tage(von,b.anreise)*W+4,wd=tage(b.anreise,ab)*W-8;const cls=b.pruefen?' pruefen':fehlt(b)?' rot':'';/* gelb vor rot: der Gast hat geändert, die Mail nennt die neuen Daten nicht */
         bars+='<div class="bk'+cls+(offen.has(b.id)?' offen':'')+(ab<=heute?' vorbei':'')+'" data-id="'+esc(b.id)+'" style="left:'+x+'px;width:'+wd+'px"><b>'+(b.gaeste?esc(b.gaeste):'?')+'</b></div>'}
       z+='<div class="r"><div class="lab"><b>'+w+'</b><small>'+esc((h.namen||{})[w]||'')+'</small></div><div class="trk" data-haus="'+h.id+'" data-wg="'+w+'" style="width:'+(N*W)+'px">'+bars+'</div></div>'}
     const ti=tage(von,heute);
