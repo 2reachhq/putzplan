@@ -33,6 +33,15 @@
     finally{laeuft=false}}
 
   const monat=dt=>String(dt.getUTCMonth()+1).padStart(2,'0')+'/'+dt.getUTCFullYear();
+  /* Die Putzkräfte sehen PUTZTAGE, keine Aufenthalte: Putzen ist am Abreisetag. Die Zahl sagt, für wie viele Personen
+     bereitgelegt wird – reist am selben Tag jemand an, dessen Personenzahl, sonst der Standard von 2 Personen.
+     Fehlt die Abreise (nur angenommen) oder die Personenzahl des neuen Gastes: rot, bitte nachfragen. */
+  const STANDARD=2;
+  function putzTage(){const m=new Map();
+    for(const b of buch){if(!b.an)continue;const d=b.ab||b.an+1;const k=b.wg+'|'+d;
+      const neu=buch.find(o=>o!==b&&o.wg===b.wg&&o.an===d);const x=m.get(k)||{wg:b.wg,d,rot:false};
+      x.neu=x.neu||neu||null;x.g=x.neu?(x.neu.g||null):STANDARD;x.frei=!x.neu;x.rot=x.rot||!b.ab||b.unsicher||(x.neu&&!x.neu.g);m.set(k,x)}
+    return[...m.values()]}
   function zeigen(){const heute=tagZahl(new Date());
     const tage=[...new Set(daten.filter(z=>z.art==='tag').map(z=>z.d))].sort((a,b)=>a-b);
     if(!tage.length){el('inhalt').innerHTML='<div class="hinweis">'+esc(C.t.leer)+'</div>';return}
@@ -48,14 +57,10 @@
     for(let i=0;i<N;){const dt=ausZahl(von+i);let n=1;while(i+n<N&&ausZahl(von+i+n).getUTCDate()!==1)n++;
       kopf+='<div class="mseg'+(i?'':' erst')+'" style="left:'+(i*W)+'px;width:'+(n*W)+'px"><span class="mo">'+monat(dt)+'</span></div>';i+=n}
     const spalte=(z,k)=>z>=von&&z<=bis?'<div class="'+k+'" style="left:'+(W+(z-von)*W)+'px"></div>':'';
-    let zeilen='';for(const wg of wgs){let balken='';
-      /* Überschneiden sich zwei Buchungen (z. B. ein Storno fehlt), liegen sie in eigenen Spuren untereinander statt sich zu verdecken */
-      const lst=buch.filter(b=>b.wg===wg&&b.an).map(b=>({b,ab:b.ab||b.an+1})).filter(o=>o.ab>=von&&o.b.an<=bis).sort((p,q)=>p.b.an-q.b.an);
-      const enden=[];lst.forEach(o=>{let l=enden.findIndex(e=>e<=o.b.an);if(l<0){l=enden.length;enden.push(0)}enden[l]=o.ab;o.l=l});const nl=enden.length;
-      for(const o of lst){const b=o.b;const x=(b.an-von)*W+4,w=(o.ab-b.an)*W-8;/* Balken genau auf den Übernachtungstagen: ab Anreisetag bis zum Tag vor der Abreise */
-        const ueber=lst.some(p=>p!==o&&p.b.an<o.ab&&b.an<p.ab);
-        balken+='<div class="bk'+(ueber?' ueber':b.fehlt?' rot':'')+(b.ab&&b.ab<=heute?' vorbei':'')+'" style="left:'+x+'px;width:'+w+'px'+(nl>1?';top:'+(9+o.l*40)+'px;transform:none':'')+'">'+PERSON+'<b>'+(b.g?esc(b.g):'?')+'</b></div>'}
-      zeilen+='<div class="r"><div class="lab">'+esc(wg)+'</div><div class="trk" style="width:'+(N*W)+'px'+(nl>1?';height:'+(12+nl*40)+'px':'')+'">'+balken+'</div></div>'}
+    const PT=putzTage();let zeilen='';for(const wg of wgs){let balken='';
+      for(const p of PT){if(p.wg!==wg||p.d<von||p.d>bis)continue;
+        balken+='<div class="bk putz'+(p.rot&&p.d>=heute?' rot':p.frei?' frei':'')+(p.d<heute?' vorbei':'')+'" style="left:'+((p.d-von)*W+4)+'px;width:'+(W-8)+'px">'+PERSON+'<b>'+(p.g?esc(p.g):'?')+'</b></div>'}
+      zeilen+='<div class="r"><div class="lab">'+esc(wg)+'</div><div class="trk" style="width:'+(N*W)+'px">'+balken+'</div></div>'}
     /* Tonnen als eigene Zeile: am Tag vor der Abholung RAUS, am Abholtag wieder REIN – in der Farbe der Tonne */
     const TF={blau:'#2F6FDB',gelb:'#F2C200',grau:'#8A8A8A'};const ton=daten.filter(z=>TF[z.art]&&z.d>=von&&z.d<=bis&&/OUT|RAUS|வெளியே/i.test(z.text));/* nur „raus“ – reinholen ist selbstverständlich */
     if(ton.length){let m='';const proTag={};for(const z of ton)(proTag[z.d]=proTag[z.d]||[]).push(z);
@@ -67,11 +72,10 @@
     /* Was am gewählten Tag zu tun ist – dieselben Zeilen wie bisher */
     /* Beim Antippen eines Tages nur kurz: welche Wohnung an dem Tag zu putzen ist (dort reisen Gäste ab), dazu die Tonnen */
     const zt=daten.filter(z=>z.d===gewaehlt);const titel=(zt.find(z=>z.art==='tag')||{}).text||'';
-    const abr=buch.filter(b=>b.ab===gewaehlt);const putz=[...new Set(abr.map(b=>b.wg))].sort((a,b)=>String(a).localeCompare(String(b),'de',{numeric:true}));
-    const unsicher=wg=>abr.some(b=>b.wg===wg&&b.unsicher);/* Abreise nur angenommen → rot, bitte nachfragen */
+    const heuteP=PT.filter(p=>p.d===gewaehlt).sort((a,b)=>String(a.wg).localeCompare(String(b.wg),'de',{numeric:true}));
     const tonnen=zt.filter(z=>(z.art==='blau'||z.art==='gelb'||z.art==='grau'||z.art==='tonne')&&/OUT|RAUS|வெளியே/i.test(z.text));
-    const zeil=putz.map(wg=>'<div class="z'+(unsicher(wg)?' fehlt':'')+'">WG '+esc(wg)+' – '+esc(C.t.putzen)+(unsicher(wg)?' ?':'')+'</div>').join('')
-      +(putz.length?'':'<div class="z leer">'+esc(C.t.nichts)+'</div>')
+    const zeil=heuteP.map(p=>'<div class="z'+(p.rot?' fehlt':'')+'">WG '+esc(p.wg)+' – '+esc(C.t.putzen)+' <span class="pz">'+PERSON.replace('width="13" height="13"','width="17" height="17"')+(p.g?esc(p.g):'?')+'</span>'+(p.rot?' ?':'')+'</div>').join('')
+      +(heuteP.length?'':'<div class="z leer">'+esc(C.t.nichts)+'</div>')
       +tonnen.map(z=>'<div class="z">'+esc(z.text)+'</div>').join('');
     const tagKarte='<section class="tag'+(gewaehlt===heute?' heute':gewaehlt<heute?' vorbei':'')+'"><h2>'+(gewaehlt===heute?'<span class="badge">'+esc(C.t.heute)+'</span>':'')+esc(titel)+'</h2>'+zeil+'</section>';
 
