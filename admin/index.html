@@ -44,12 +44,12 @@ main{padding-bottom:120px}
 .qlogo{flex:none;width:46px;height:46px;border-radius:12px;display:grid;place-items:center}
 .warn{background:#FDECEC;color:#A51B1B;border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.4}
 .bk.ueber,.bk.ueber.vorbei{background:repeating-linear-gradient(135deg,#D93636 0 7px,#B42525 7px 14px)}
-.code{align-self:flex-start;display:flex;align-items:center;gap:10px;font:inherit;padding:8px 8px 8px 14px;border-radius:12px;border:1px solid #E2E2E2;background:#F6F6F6;color:#161616;cursor:pointer;max-width:100%}
+.code{align-self:flex-start;display:flex;align-items:center;gap:10px;font:inherit;min-height:44px;padding:8px 16px;border-radius:12px;border:1px solid #E2E2E2;background:#F6F6F6;color:#161616;cursor:pointer;max-width:100%}
 .code span{font-size:16px;font-weight:700;letter-spacing:.02em;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .code em{font-style:normal;font-size:12px;font-weight:600;background:#161616;color:#fff;border-radius:8px;padding:6px 10px;white-space:nowrap}
-.code.ok{border-color:#2B8C78}.code.ok em{background:#2B8C78}
+.code.ok{border-color:#2B8C78;color:#2B8C78}.code.ok em{background:#2B8C78}
 .codezeile{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.codezeile .code{align-self:auto}
-.extlink{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid #E2E2E2;background:#fff;color:#161616;font-size:14px;font-weight:600;text-decoration:none}
+.extlink{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:12px;border:0;background:#161616;color:#fff;font-size:15px;font-weight:600;text-decoration:none}
 </style></head>
 <body><header><div class="kz"><div><span class="ort">Admin</span><h1>Buchungen</h1></div><div class="st"><span>Stand</span><b id="stand"></b></div></div></header>
 <main id="app"><div class="hinweis">…</div></main>
@@ -150,8 +150,8 @@ main{padding-bottom:120px}
     const nN=b.anreise&&b.abreise?tage(b.anreise,b.abreise):0;const ue=neu?[]:ueberVon(b);
     bf.innerHTML='<div class="bkopf">'+quelleLogo(neu?'block':b.quelle)+'<div class="bkt"><h2>'+(neu?'Blockieren':esc(b.gast||'Buchung'))+'</h2><div class="unter">'+(neu?esc(h?h.name:''):esc(b.quelle==='airbnb'?'Airbnb':b.quelle==='booking'?'Booking.com':'Direkt')+(b.pruefen?' · geändert – bitte prüfen':''))+'</div></div></div>'
       +(ue.length?'<div class="warn">Überschneidet sich mit '+ue.map(o=>esc(o.gast||(o.quelle==='airbnb'?'Airbnb':'Booking'))+' ('+dat(o.anreise)+' → '+dat(o.abreise)+')').join(', ')+'. Eine der Buchungen ist vermutlich storniert oder verlegt – bitte bei Airbnb/Booking prüfen.</div>':'')
-      +(neu||!b.code?'':'<div class="codezeile"><button type="button" class="code" id="bCode" title="Buchungsnummer kopieren"><span>'+esc(b.code)+'</span><em>Kopieren</em></button>'
-        +(quelleLink(b)?'<a class="extlink" href="'+esc(quelleLink(b))+'" target="_blank" rel="noopener" title="'+(b.quelle==='airbnb'?'Bei Airbnb öffnen':'Bei Booking öffnen')+'">'+'Öffnen <span aria-hidden="true">↗</span></a>':'')+'</div>')
+      +(neu||!b.code?'':'<div class="codezeile"><button type="button" class="code" id="bCode" title="Buchungsnummer kopieren"><span>'+esc(b.code)+'</span></button>'
+        +(quelleLink(b)?'<a class="extlink" href="'+esc(quelleLink(b))+'" target="_blank" rel="noopener" title="'+(b.quelle==='airbnb'?'Bei Airbnb öffnen':'Bei Booking öffnen')+'">'+'Öffnen</a>':'')+'</div>')
       +'<div class="raster"><label class="feld breit">Wohnung<select name="wohnung">'+wohn.map(o=>'<option value="'+o.v+'"'+(o.v===b.haus+'|'+b.wg?' selected':'')+'>'+esc(o.t)+'</option>').join('')+'</select></label>'
       +'<label class="feld breit">'+(neu?'Ab':'Anreise')+'<input type="date" name="anreise" value="'+esc(b.anreise)+'" required></label>'
       +'<label class="feld'+(!b.abreise?' rot':'')+'">Nächte<select name="naechte"><option value="">–</option>'+[...Array(30)].map((_,i)=>i+1).concat(nN>30?[nN]:[]).map(n=>'<option'+(nN===n?' selected':'')+'>'+n+'</option>').join('')+'</select></label>'
@@ -166,7 +166,7 @@ main{padding-bottom:120px}
     const ausN=()=>{if(fA.value&&fN.value)fB.value=plus(fA.value,+fN.value)};
     fN.onchange=ausN;fA.onchange=()=>{if(fN.value)ausN()};
     fB.onchange=()=>{const n=fA.value&&fB.value?tage(fA.value,fB.value):0;if(n>0&&![...fN.options].some(o=>+o.value===n))fN.add(new Option(String(n),String(n)));fN.value=n>0?String(n):''};
-    const cb=bf.querySelector('#bCode');if(cb)cb.onclick=()=>kopieren(b.code).then(ok=>{const e=cb.querySelector('em');cb.classList.toggle('ok',ok);e.textContent=ok?'Kopiert ✓':'Nicht möglich';clearTimeout(cb.t);cb.t=setTimeout(()=>{cb.classList.remove('ok');e.textContent='Kopieren'},1800)});
+    const cb=bf.querySelector('#bCode');if(cb)cb.onclick=()=>{cb.style.minWidth=cb.offsetWidth+'px';return kopieren(b.code).then(ok=>{const e=cb.querySelector('span');cb.classList.toggle('ok',ok);e.textContent=ok?'Kopiert ✓':'Nicht möglich';clearTimeout(cb.t);cb.t=setTimeout(()=>{cb.classList.remove('ok');e.textContent=b.code},1500)})};/* ganze Nummer antippen = kopieren */
     const nehmen=status=>{const f=new FormData(bf);const[hh,ww]=String(f.get('wohnung')||'|').split('|');
       const felder={haus:hh,wg:ww,anreise:f.get('anreise')||'',abreise:f.get('abreise')||'',gaeste:f.get('gaeste')||'',gast:f.get('gast')||(neu?'Blockiert':'')};
       if(b.pruefen&&!neu)felder.geprueft='1';/* auch ohne Änderung: „Geprüft“ veröffentlichen nimmt das Gelb weg */
