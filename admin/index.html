@@ -48,6 +48,8 @@ main{padding-bottom:120px}
 .code span{font-size:16px;font-weight:700;letter-spacing:.02em;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .code em{font-style:normal;font-size:12px;font-weight:600;background:#161616;color:#fff;border-radius:8px;padding:6px 10px;white-space:nowrap}
 .code.ok{border-color:#2B8C78}.code.ok em{background:#2B8C78}
+.codezeile{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.codezeile .code{align-self:auto}
+.extlink{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid #E2E2E2;background:#fff;color:#161616;font-size:14px;font-weight:600;text-decoration:none}
 </style></head>
 <body><header><div class="kz"><div><span class="ort">Admin</span><h1>Buchungen</h1></div><div class="st"><span>Stand</span><b id="stand"></b></div></div></header>
 <main id="app"><div class="hinweis">…</div></main>
@@ -129,6 +131,11 @@ main{padding-bottom:120px}
     const kals=[...app.querySelectorAll('.kal')];const start=scrollX!=null?scrollX:6*W;
     kals.forEach(k=>{k.scrollLeft=start;k.addEventListener('scroll',()=>{scrollX=k.scrollLeft;kals.forEach(o=>{if(o!==k&&Math.abs(o.scrollLeft-k.scrollLeft)>1)o.scrollLeft=k.scrollLeft})},{passive:true})});
     zaehler()}
+  /* Direkt zur Buchung im Gastgeber-Bereich (wie die Links in den Mails, ohne deren Sitzungs-Zeichen – dort ggf. einloggen) */
+  function quelleLink(b){const c=encodeURIComponent(b.code||'');if(!c)return'';
+    if(b.quelle==='airbnb')return'https://www.airbnb.de/hosting/reservations/details/'+c;
+    if(b.quelle==='booking')return'https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/booking.html?res_id='+c+(/^\d+$/.test(b.unterkunft||'')?'&hotel_id='+b.unterkunft:'')+'&lang=de';
+    return''}
   function quelleLogo(q){if(q==='airbnb')return'<span class="qlogo" style="background:#FF385C" title="Airbnb"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17.5c-1.6-2-4.2-5.3-4.2-7.6a4.2 4.2 0 0 1 8.4 0c0 2.3-2.6 5.6-4.2 7.6Z"/><path d="M12 17.5c2.2 2.6 4.8 3.4 6.3 2.2 1.6-1.3 1-3.4-.2-6L14.6 6.4C13.6 4.5 12.9 4 12 4s-1.6.5-2.6 2.4L5.9 13.7c-1.2 2.6-1.8 4.7-.2 6 1.5 1.2 4.1.4 6.3-2.2Z"/></svg></span>';
     if(q==='booking')return'<span class="qlogo" style="background:#003580;color:#fff;font-weight:800;font-size:22px;letter-spacing:-.04em" title="Booking.com">B<i style="color:#3FA9F5;font-style:normal">.</i></span>';
     return'<span class="qlogo" style="background:#EDEDED;color:#555" title="Direkt"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg></span>'}
@@ -143,7 +150,8 @@ main{padding-bottom:120px}
     const nN=b.anreise&&b.abreise?tage(b.anreise,b.abreise):0;const ue=neu?[]:ueberVon(b);
     bf.innerHTML='<div class="bkopf">'+quelleLogo(neu?'block':b.quelle)+'<div class="bkt"><h2>'+(neu?'Blockieren':esc(b.gast||'Buchung'))+'</h2><div class="unter">'+(neu?esc(h?h.name:''):esc(b.quelle==='airbnb'?'Airbnb':b.quelle==='booking'?'Booking.com':'Direkt')+(b.pruefen?' · geändert – bitte prüfen':''))+'</div></div></div>'
       +(ue.length?'<div class="warn">Überschneidet sich mit '+ue.map(o=>esc(o.gast||(o.quelle==='airbnb'?'Airbnb':'Booking'))+' ('+dat(o.anreise)+' → '+dat(o.abreise)+')').join(', ')+'. Eine der Buchungen ist vermutlich storniert oder verlegt – bitte bei Airbnb/Booking prüfen.</div>':'')
-      +(neu||!b.code?'':'<button type="button" class="code" id="bCode" title="Buchungsnummer kopieren"><span>'+esc(b.code)+'</span><em>Kopieren</em></button>')
+      +(neu||!b.code?'':'<div class="codezeile"><button type="button" class="code" id="bCode" title="Buchungsnummer kopieren"><span>'+esc(b.code)+'</span><em>Kopieren</em></button>'
+        +(quelleLink(b)?'<a class="extlink" href="'+esc(quelleLink(b))+'" target="_blank" rel="noopener" title="'+(b.quelle==='airbnb'?'Bei Airbnb öffnen':'Bei Booking öffnen')+'">'+'Öffnen <span aria-hidden="true">↗</span></a>':'')+'</div>')
       +'<div class="raster"><label class="feld breit">Wohnung<select name="wohnung">'+wohn.map(o=>'<option value="'+o.v+'"'+(o.v===b.haus+'|'+b.wg?' selected':'')+'>'+esc(o.t)+'</option>').join('')+'</select></label>'
       +'<label class="feld breit">'+(neu?'Ab':'Anreise')+'<input type="date" name="anreise" value="'+esc(b.anreise)+'" required></label>'
       +'<label class="feld'+(!b.abreise?' rot':'')+'">Nächte<select name="naechte"><option value="">–</option>'+[...Array(30)].map((_,i)=>i+1).concat(nN>30?[nN]:[]).map(n=>'<option'+(nN===n?' selected':'')+'>'+n+'</option>').join('')+'</select></label>'
