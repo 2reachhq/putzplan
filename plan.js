@@ -49,10 +49,13 @@
       kopf+='<div class="mseg'+(i?'':' erst')+'" style="left:'+(i*W)+'px;width:'+(n*W)+'px"><span class="mo">'+monat(dt)+'</span></div>';i+=n}
     const spalte=(z,k)=>z>=von&&z<=bis?'<div class="'+k+'" style="left:'+(W+(z-von)*W)+'px"></div>':'';
     let zeilen='';for(const wg of wgs){let balken='';
-      for(const b of buch){if(b.wg!==wg||!b.an)continue;const ohneAb=!b.ab;const ab=ohneAb?b.an+1:b.ab;if(ab<von||b.an>bis)continue;
-        const x=(b.an-von)*W+4,w=(ab-b.an)*W-8;/* Balken genau auf den Übernachtungstagen: ab Anreisetag bis zum Tag vor der Abreise */const rot=b.fehlt;
-        balken+='<div class="bk'+(rot?' rot':'')+(b.ab&&b.ab<=heute?' vorbei':'')+'" style="left:'+x+'px;width:'+w+'px">'+PERSON+'<b>'+(b.g?esc(b.g):'?')+'</b></div>'}
-      zeilen+='<div class="r"><div class="lab">'+esc(wg)+'</div><div class="trk" style="width:'+(N*W)+'px">'+balken+'</div></div>'}
+      /* Überschneiden sich zwei Buchungen (z. B. ein Storno fehlt), liegen sie in eigenen Spuren untereinander statt sich zu verdecken */
+      const lst=buch.filter(b=>b.wg===wg&&b.an).map(b=>({b,ab:b.ab||b.an+1})).filter(o=>o.ab>=von&&o.b.an<=bis).sort((p,q)=>p.b.an-q.b.an);
+      const enden=[];lst.forEach(o=>{let l=enden.findIndex(e=>e<=o.b.an);if(l<0){l=enden.length;enden.push(0)}enden[l]=o.ab;o.l=l});const nl=enden.length;
+      for(const o of lst){const b=o.b;const x=(b.an-von)*W+4,w=(o.ab-b.an)*W-8;/* Balken genau auf den Übernachtungstagen: ab Anreisetag bis zum Tag vor der Abreise */
+        const ueber=lst.some(p=>p!==o&&p.b.an<o.ab&&b.an<p.ab);
+        balken+='<div class="bk'+(ueber?' ueber':b.fehlt?' rot':'')+(b.ab&&b.ab<=heute?' vorbei':'')+'" style="left:'+x+'px;width:'+w+'px'+(nl>1?';top:'+(9+o.l*40)+'px;transform:none':'')+'">'+PERSON+'<b>'+(b.g?esc(b.g):'?')+'</b></div>'}
+      zeilen+='<div class="r"><div class="lab">'+esc(wg)+'</div><div class="trk" style="width:'+(N*W)+'px'+(nl>1?';height:'+(12+nl*40)+'px':'')+'">'+balken+'</div></div>'}
     /* Tonnen als eigene Zeile: am Tag vor der Abholung RAUS, am Abholtag wieder REIN – in der Farbe der Tonne */
     const TF={blau:'#2F6FDB',gelb:'#F2C200',grau:'#8A8A8A'};const ton=daten.filter(z=>TF[z.art]&&z.d>=von&&z.d<=bis&&/OUT|RAUS|வெளியே/i.test(z.text));/* nur „raus“ – reinholen ist selbstverständlich */
     if(ton.length){let m='';const proTag={};for(const z of ton)(proTag[z.d]=proTag[z.d]||[]).push(z);

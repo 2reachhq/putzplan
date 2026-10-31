@@ -38,6 +38,12 @@ main{padding-bottom:120px}
 .feld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#666;min-width:0}
 .feld.rot input,.feld.rot select{border-color:#D93636;background:#FFF5F5}
 .knoepfe{display:flex;gap:8px}.knoepfe .knopf{flex:1}
+.feld input[type=date]{-webkit-appearance:none;appearance:none;display:block;min-height:46px;text-align:left}
+.feld input[type=date]::-webkit-date-and-time-value{text-align:left}
+.bkopf{display:flex;align-items:center;gap:12px;min-width:0}.bkt{min-width:0}.bkt h2{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bkt .unter{margin-top:2px}
+.qlogo{flex:none;width:46px;height:46px;border-radius:12px;display:grid;place-items:center}
+.warn{background:#FDECEC;color:#A51B1B;border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.4}
+.bk.ueber,.bk.ueber.vorbei{background:repeating-linear-gradient(135deg,#D93636 0 7px,#B42525 7px 14px)}
 .code{align-self:flex-start;display:flex;align-items:center;gap:10px;font:inherit;padding:8px 8px 8px 14px;border-radius:12px;border:1px solid #E2E2E2;background:#F6F6F6;color:#161616;cursor:pointer;max-width:100%}
 .code span{font-size:16px;font-weight:700;letter-spacing:.02em;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .code em{font-style:normal;font-size:12px;font-weight:600;background:#161616;color:#fff;border-radius:8px;padding:6px 10px;white-space:nowrap}
@@ -75,13 +81,17 @@ main{padding-bottom:120px}
       const r=await dienst({typ:'login'}).catch(()=>null);if(r&&r.ok){try{localStorage.setItem('putzplan.pin',pin);localStorage.setItem('putzplan.pinBis',String(Date.now()+TAGE7))}catch(e){}laden()}else anmelden(r?'PIN falsch (nach 5 Fehlversuchen 1 Stunde gesperrt).':'Keine Verbindung.')}}
 
   async function laden(){const r=await dienst({typ:'liste'}).catch(()=>null);if(!r||!r.ok){anmelden(r&&r.fehler==='passwort'?'':'Keine Verbindung.');return}
-    daten=r;offen.clear();unten.hidden=false;zeigen();document.getElementById('stand').textContent=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}
+    daten=r;offen.clear();unten.hidden=false;zeigen();const st=document.getElementById('stand');st.textContent=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+    /* Beim Öffnen sofort Gmail abgleichen (im Hintergrund) und danach neu laden – nicht erst auf den 5-Minuten-Lauf warten */
+    if(!laden.auto){laden.auto=true;st.textContent='Gmail …';await dienst({typ:'abgleich'}).catch(()=>null);if(!offen.size)await laden();else st.textContent=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}}
 
   /* ---------- Stand = Server + noch nicht veröffentlichte Änderungen ---------- */
   const stand=b=>{const f=(offen.get(b.id)||{}).felder||{};return{...b,...f,...(f.geprueft?{pruefen:''}:{})}};
   const alle=()=>daten.buchungen.map(stand).filter(b=>b.status!=='storniert'||offen.has(b.id));
   const fehlt=b=>b.status!=='storniert'&&(!b.gaeste||!b.abreise||!b.wg||!b.haus)&&(b.abreise||b.anreise||'9')>=daten.heute;
   const hausVon=id=>daten.haeuser.find(h=>h.id===id);
+  /* Buchungen derselben Wohnung, deren Nächte sich mit b überschneiden – darf es nie geben */
+  const ueberVon=b=>{const ab=b.abreise||plus(b.anreise,1);return alle().filter(o=>o.id!==b.id&&o.status!=='storniert'&&b.status!=='storniert'&&o.haus===b.haus&&+o.wg===+b.wg&&o.anreise&&b.anreise&&o.anreise<ab&&b.anreise<(o.abreise||plus(o.anreise,1)))};
 
   function kalender(h,von,N){const heute=daten.heute;const L=alle().filter(b=>b.haus===h.id&&b.status!=='storniert');
     let kopf='';for(let i=0;i<N;i++){const d=plus(von,i);const dt=new Date(d+'T12:00:00Z');
@@ -91,10 +101,13 @@ main{padding-bottom:120px}
     for(let i=0;i<N;){const dt=new Date(plus(von,i)+'T12:00:00Z');let n=1;while(i+n<N&&plus(von,i+n).slice(8)!=='01')n++;
       kopf+='<div class="mseg'+(i?'':' erst')+'" style="left:'+(i*W)+'px;width:'+(n*W)+'px"><span class="mo">'+String(dt.getUTCMonth()+1).padStart(2,'0')+'/'+dt.getUTCFullYear()+'</span></div>';i+=n}
     let z='';for(const w of h.wgs){let bars='';
-      for(const b of L.filter(x=>+x.wg===+w&&x.anreise)){const ab=b.abreise||plus(b.anreise,1);if(ab<von||b.anreise>plus(von,N-1))continue;
-        const x=tage(von,b.anreise)*W+4,wd=tage(b.anreise,ab)*W-8;const cls=b.pruefen?' pruefen':fehlt(b)?' rot':'';/* gelb vor rot: der Gast hat geändert, die Mail nennt die neuen Daten nicht */
-        bars+='<div class="bk'+cls+(offen.has(b.id)?' offen':'')+(ab<=heute?' vorbei':'')+'" data-id="'+esc(b.id)+'" style="left:'+x+'px;width:'+wd+'px"><b>'+(b.gaeste?esc(b.gaeste):'?')+'</b></div>'}
-      z+='<div class="r"><div class="lab"><b>'+w+'</b><small>'+esc((h.namen||{})[w]||'')+'</small></div><div class="trk" data-haus="'+h.id+'" data-wg="'+w+'" style="width:'+(N*W)+'px">'+bars+'</div></div>'}
+      /* Überschneidungen (meist ein fehlendes Storno) liegen in eigenen Spuren untereinander und sind rot gestreift */
+      const lst=L.filter(x=>+x.wg===+w&&x.anreise).map(b=>({b,ab:b.abreise||plus(b.anreise,1)})).filter(o=>o.ab>=von&&o.b.anreise<=plus(von,N-1)).sort((p,q)=>p.b.anreise.localeCompare(q.b.anreise));
+      const enden=[];lst.forEach(o=>{let l=enden.findIndex(e=>e<=o.b.anreise);if(l<0){l=enden.length;enden.push('')}enden[l]=o.ab;o.l=l});const nl=enden.length;
+      for(const o of lst){const b=o.b,ab=o.ab;
+        const x=tage(von,b.anreise)*W+4,wd=tage(b.anreise,ab)*W-8;const cls=ueberVon(b).length?' ueber':b.pruefen?' pruefen':fehlt(b)?' rot':'';/* gelb vor rot: der Gast hat geändert, die Mail nennt die neuen Daten nicht */
+        bars+='<div class="bk'+cls+(offen.has(b.id)?' offen':'')+(ab<=heute?' vorbei':'')+'" data-id="'+esc(b.id)+'" style="left:'+x+'px;width:'+wd+'px'+(nl>1?';top:'+(9+o.l*40)+'px;transform:none':'')+'"><b>'+(b.gaeste?esc(b.gaeste):'?')+'</b></div>'}
+      z+='<div class="r"><div class="lab"><b>'+w+'</b><small>'+esc((h.namen||{})[w]||'')+'</small></div><div class="trk" data-haus="'+h.id+'" data-wg="'+w+'" style="width:'+(N*W)+'px'+(nl>1?';height:'+(12+nl*40)+'px':'')+'">'+bars+'</div></div>'}
     const ti=tage(von,heute);
     return '<div class="haus">'+esc(h.name)+'</div><div class="karte adm"><div class="kal"><div class="kin" style="width:'+(LAB+N*W)+'px">'
       +(ti>=0&&ti<N?'<div class="sp heute" style="left:'+(LAB+ti*W)+'px"></div>':'')
@@ -104,17 +117,21 @@ main{padding-bottom:120px}
   function zeigen(){const heute=daten.heute;const von=plus(heute,-7);
     const letzte=alle().reduce((m,b)=>{const x=b.abreise||b.anreise||'';return x>m?x:m},plus(heute,60));const N=Math.min(tage(von,letzte)+3,420);
     const L=alle().filter(b=>b.status!=='storniert'&&(b.abreise||b.anreise||'9')>=heute).sort((a,b)=>(a.anreise||'').localeCompare(b.anreise||''));
-    const orange=L.filter(b=>b.pruefen),rot=L.filter(b=>fehlt(b)&&!b.pruefen);
-    const zeile=(b,k)=>{const h=hausVon(b.haus);return '<div class="zeile '+k+'" data-id="'+esc(b.id)+'"><div><b>'+dat(b.anreise)+' → '+dat(b.abreise)+'</b><div class="klein">'+esc(h?h.name.replace(/ \d+$/,''):'?')+' · WG '+esc(b.wg||'?')+' · '+esc(b.gast||'ohne Name')+'</div></div><span class="klein">'+(k==='rot'?'fehlt':'geändert')+' ›</span></div>'};
+    const ueber=L.filter(b=>ueberVon(b).length),orange=L.filter(b=>b.pruefen&&!ueber.includes(b)),rot=L.filter(b=>fehlt(b)&&!b.pruefen&&!ueber.includes(b));
+    const zeile=(b,k)=>{const h=hausVon(b.haus);return '<div class="zeile '+k+'" data-id="'+esc(b.id)+'"><div><b>'+dat(b.anreise)+' → '+dat(b.abreise)+'</b><div class="klein">'+esc(h?h.name.replace(/ \d+$/,''):'?')+' · WG '+esc(b.wg||'?')+' · '+esc(b.gast||'ohne Name')+'</div></div><span class="klein">'+(k==='rot'?'fehlt':k==='ueber'?'überschneidet sich':'geändert')+' ›</span></div>'};
     app.innerHTML='<div class="leiste"><button class="knopf hell" data-a="abgleich">Gmail jetzt abgleichen</button><button class="knopf hell" data-a="abmelden">Abmelden</button></div>'
       +daten.haeuser.map(h=>kalender(h,von,N)).join('')
       +'<div class="legende"><span><i style="background:#2B8C78"></i>Personen</span><span><i style="background:#D93636"></i>fehlt</span><span><i style="background:#F5C400"></i>vom Gast geändert</span></div>'
       +'<div class="klein" style="margin:8px 4px">Buchung antippen = ändern oder verlängern. Leeren Tag antippen = blockieren.</div>'
+      +(ueber.length?'<div class="abschnitt rot">Überschneidung – eine davon ist vermutlich storniert oder verlegt ('+ueber.length+')</div>'+ueber.map(b=>zeile(b,'ueber')).join(''):'')
       +(rot.length?'<div class="abschnitt rot">Fehlt etwas ('+rot.length+')</div>'+rot.map(b=>zeile(b,'rot')).join(''):'')
       +(orange.length?'<div class="abschnitt" style="color:#9A7A00">Vom Gast geändert – bitte bei Airbnb/Booking nachsehen ('+orange.length+')</div>'+orange.map(b=>zeile(b,'orange')).join(''):'');
     const kals=[...app.querySelectorAll('.kal')];const start=scrollX!=null?scrollX:6*W;
     kals.forEach(k=>{k.scrollLeft=start;k.addEventListener('scroll',()=>{scrollX=k.scrollLeft;kals.forEach(o=>{if(o!==k&&Math.abs(o.scrollLeft-k.scrollLeft)>1)o.scrollLeft=k.scrollLeft})},{passive:true})});
     zaehler()}
+  function quelleLogo(q){if(q==='airbnb')return'<span class="qlogo" style="background:#FF385C" title="Airbnb"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17.5c-1.6-2-4.2-5.3-4.2-7.6a4.2 4.2 0 0 1 8.4 0c0 2.3-2.6 5.6-4.2 7.6Z"/><path d="M12 17.5c2.2 2.6 4.8 3.4 6.3 2.2 1.6-1.3 1-3.4-.2-6L14.6 6.4C13.6 4.5 12.9 4 12 4s-1.6.5-2.6 2.4L5.9 13.7c-1.2 2.6-1.8 4.7-.2 6 1.5 1.2 4.1.4 6.3-2.2Z"/></svg></span>';
+    if(q==='booking')return'<span class="qlogo" style="background:#003580;color:#fff;font-weight:800;font-size:22px;letter-spacing:-.04em" title="Booking.com">B<i style="color:#3FA9F5;font-style:normal">.</i></span>';
+    return'<span class="qlogo" style="background:#EDEDED;color:#555" title="Direkt"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg></span>'}
   function zaehler(){pub.disabled=!offen.size;pub.textContent=offen.size?'Veröffentlichen ('+offen.size+')':'Veröffentlichen'}
 
   /* Buchungsnummer mit einem Tipp in die Zwischenablage; ältere Safari-Fassungen über ein verstecktes Feld */
@@ -123,16 +140,24 @@ main{padding-bottom:120px}
   /* ---------- Blatt: Buchung ändern oder Tag blockieren ---------- */
   function oeffnen(id,vorgabe){const neu=!id;const b=neu?{id:'neu'+(++neuNr),quelle:'direkt',status:'bestaetigt',...vorgabe}:stand(daten.buchungen.find(x=>x.id===id));
     const h=hausVon(b.haus);const wohn=daten.haeuser.flatMap(x=>x.wgs.map(w=>({v:x.id+'|'+w,t:x.name.replace(/ \d+$/,'')+' · WG '+w+' – '+((x.namen||{})[w]||'')})));
-    bf.innerHTML='<h2>'+(neu?'Blockieren':esc(b.gast||'Buchung'))+'</h2><div class="unter">'+(neu?esc(h?h.name:''):esc(b.quelle==='airbnb'?'Airbnb':b.quelle==='booking'?'Booking':'Direkt')+(b.pruefen?' · geändert – bitte prüfen':''))+'</div>'
+    const nN=b.anreise&&b.abreise?tage(b.anreise,b.abreise):0;const ue=neu?[]:ueberVon(b);
+    bf.innerHTML='<div class="bkopf">'+quelleLogo(neu?'block':b.quelle)+'<div class="bkt"><h2>'+(neu?'Blockieren':esc(b.gast||'Buchung'))+'</h2><div class="unter">'+(neu?esc(h?h.name:''):esc(b.quelle==='airbnb'?'Airbnb':b.quelle==='booking'?'Booking.com':'Direkt')+(b.pruefen?' · geändert – bitte prüfen':''))+'</div></div></div>'
+      +(ue.length?'<div class="warn">Überschneidet sich mit '+ue.map(o=>esc(o.gast||(o.quelle==='airbnb'?'Airbnb':'Booking'))+' ('+dat(o.anreise)+' → '+dat(o.abreise)+')').join(', ')+'. Eine der Buchungen ist vermutlich storniert oder verlegt – bitte bei Airbnb/Booking prüfen.</div>':'')
       +(neu||!b.code?'':'<button type="button" class="code" id="bCode" title="Buchungsnummer kopieren"><span>'+esc(b.code)+'</span><em>Kopieren</em></button>')
       +'<div class="raster"><label class="feld breit">Wohnung<select name="wohnung">'+wohn.map(o=>'<option value="'+o.v+'"'+(o.v===b.haus+'|'+b.wg?' selected':'')+'>'+esc(o.t)+'</option>').join('')+'</select></label>'
-      +'<label class="feld">'+(neu?'Ab':'Anreise')+'<input type="date" name="anreise" value="'+esc(b.anreise)+'" required></label>'
+      +'<label class="feld breit">'+(neu?'Ab':'Anreise')+'<input type="date" name="anreise" value="'+esc(b.anreise)+'" required></label>'
+      +'<label class="feld'+(!b.abreise?' rot':'')+'">Nächte<select name="naechte"><option value="">–</option>'+[...Array(30)].map((_,i)=>i+1).concat(nN>30?[nN]:[]).map(n=>'<option'+(nN===n?' selected':'')+'>'+n+'</option>').join('')+'</select></label>'
       +'<label class="feld'+(!b.abreise?' rot':'')+'">Bis wann<input type="date" name="abreise" value="'+esc(b.abreise)+'"></label>'
       +'<label class="feld'+(!b.gaeste?' rot':'')+'">Personen<select name="gaeste"><option value="">–</option>'+[1,2,3,4,5,6,7].concat(+b.gaeste>7?[+b.gaeste]:[]).map(n=>'<option'+(+b.gaeste===n?' selected':'')+'>'+n+'</option>').join('')+'</select></label>'
       +'<label class="feld">Name<input type="text" name="gast" value="'+esc(b.gast)+'" placeholder="'+(neu?'Blockiert':'')+'"></label></div>'
       +'<div class="knoepfe"><button class="knopf hell" type="button" id="bZu">Abbrechen</button><button class="knopf" value="ok" id="bOk">'+(b.pruefen&&!neu?'Geprüft':'Übernehmen')+'</button></div>'
       +(neu?'':'<button class="knopf rot" type="button" id="bStorno">Buchung stornieren</button>');
     bf.querySelector('#bZu').onclick=()=>blatt.close();
+    /* Nächte oder „Bis wann“ – das andere rechnet sich aus */
+    const fA=bf.elements.anreise,fB=bf.elements.abreise,fN=bf.elements.naechte;
+    const ausN=()=>{if(fA.value&&fN.value)fB.value=plus(fA.value,+fN.value)};
+    fN.onchange=ausN;fA.onchange=()=>{if(fN.value)ausN()};
+    fB.onchange=()=>{const n=fA.value&&fB.value?tage(fA.value,fB.value):0;if(n>0&&![...fN.options].some(o=>+o.value===n))fN.add(new Option(String(n),String(n)));fN.value=n>0?String(n):''};
     const cb=bf.querySelector('#bCode');if(cb)cb.onclick=()=>kopieren(b.code).then(ok=>{const e=cb.querySelector('em');cb.classList.toggle('ok',ok);e.textContent=ok?'Kopiert ✓':'Nicht möglich';clearTimeout(cb.t);cb.t=setTimeout(()=>{cb.classList.remove('ok');e.textContent='Kopieren'},1800)});
     const nehmen=status=>{const f=new FormData(bf);const[hh,ww]=String(f.get('wohnung')||'|').split('|');
       const felder={haus:hh,wg:ww,anreise:f.get('anreise')||'',abreise:f.get('abreise')||'',gaeste:f.get('gaeste')||'',gast:f.get('gast')||(neu?'Blockiert':'')};
@@ -150,7 +175,7 @@ main{padding-bottom:120px}
 
   app.addEventListener('click',async e=>{const a=e.target.closest('[data-a]');
     if(a){if(a.dataset.a==='abmelden'){if(offen.size&&!confirm('Nicht veröffentlichte Änderungen gehen verloren. Trotzdem abmelden?'))return;pin='';try{localStorage.removeItem('putzplan.pin')}catch(err){}anmelden();return}
-      if(a.dataset.a==='abgleich'){if(offen.size&&!confirm('Nicht veröffentlichte Änderungen gehen verloren. Trotzdem neu laden?'))return;a.disabled=true;a.textContent='Gmail wird gelesen …';await dienst({typ:'abgleich'}).catch(()=>null);await laden();return}}
+      if(a.dataset.a==='abgleich'){if(offen.size&&!confirm('Nicht veröffentlichte Änderungen gehen verloren. Trotzdem neu laden?'))return;a.disabled=true;a.textContent='Gmail wird gelesen …';await dienst({typ:'abgleich',tage:45}).catch(()=>null);await laden();return}}
     const bar=e.target.closest('.bk[data-id],.zeile[data-id]');if(bar){oeffnen(bar.dataset.id);return}
     const t=e.target.closest('.trk[data-wg]');if(t){const r=t.getBoundingClientRect();const i=Math.floor((e.clientX-r.left)/W);const d=plus(plus(daten.heute,-7),i);
       oeffnen(null,{haus:t.dataset.haus,wg:t.dataset.wg,anreise:d,abreise:plus(d,1),gaeste:2,gast:''})}});

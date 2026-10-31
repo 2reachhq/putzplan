@@ -49,6 +49,7 @@ main{padding:10px 10px calc(28px + env(safe-area-inset-bottom,0px));max-width:56
 .bk b{font-weight:700}
 .bk.vorbei{background:#9BC4BA}
 .bk.rot{background:#D93636}
+.bk.ueber,.bk.ueber.vorbei{background:repeating-linear-gradient(135deg,#D93636 0 7px,#B42525 7px 14px)}
 .kal::-webkit-scrollbar{height:0}
 .tonnen .trk{height:46px}.tonnen .lab{color:#555}
 .tn{position:absolute;top:0;bottom:0;width:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}

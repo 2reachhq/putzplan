@@ -102,7 +102,7 @@ function zusammen(L,x){let b=L.find(o=>o.id===x.id);const neu=!b;if(neu){b={id:x
 /* ---------- 1. Abgleich mit Gmail ---------- */
 function abgleich(tage){const lock=LockService.getScriptLock();if(!lock.tryLock(20000))return;
   try{const sh=blatt('Gesehen');const gesehen=new Set(sh.getRange('A:A').getValues().map(r=>String(r[0])).filter(Boolean));const neuGesehen=[];
-    const L=buchungenLesen();let n=0;const t=tage||3;
+    const L=buchungenLesen();let n=0;const t=+tage>0?Math.min(+tage,120):3;/* der Zeitauslöser übergibt ein Ereignis-Objekt, keine Zahl – früher wurde daraus „newer_than:[object Object]d“ und es kam nie eine Mail */
     const Q=[['ab','from:automated@airbnb.com (subject:"Buchung bestätigt" OR subject:"Storniert: Buchung" OR subject:"Buchung aktualisiert" OR subject:"Buchungsänderung wurde bestätigt") newer_than:'+t+'d'],
       ['bk','from:noreply@booking.com (subject:"neue Buchung" OR subject:"Last-Minute-Buchung" OR subject:storniert OR subject:geändert) newer_than:'+t+'d'],
       ['bn','from:guest.booking.com newer_than:'+t+'d']];
@@ -223,7 +223,7 @@ function doPost(e){let x={};try{x=JSON.parse(e.postData.contents)}catch(err){ret
       try{sofortMelden(L,fertig.map(x=>Object.assign({},x.buchung,{alteAbreise:x.alteAbreise})))}catch(e){console.error(e)}
       return json({ok:true,fertig:fertig.map(x=>({vorher:x.vorher,buchung:x.buchung}))})}
     finally{lock.releaseLock()}}
-  if(x.typ==='abgleich'){abgleich(7);return json({ok:true})}
+  if(x.typ==='abgleich'){abgleich(+x.tage||7);return json({ok:true})}
   return json({fehler:'typ'})}
 const gleich=(a,b)=>{a=String(a||'');b=String(b||'');let d=a.length^b.length;for(let i=0;i<a.length;i++)d|=a.charCodeAt(i)^(b.charCodeAt(i)||0);return d===0&&a.length>0};
 /* Nur EIN Admin: Die PIN steht im privaten Blatt „Info“ der Verwaltungstabelle (Zeile „Admin-PIN“) – niemand kann sie über
