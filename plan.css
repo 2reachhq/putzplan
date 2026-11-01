@@ -50,6 +50,8 @@ main{padding:10px 10px calc(28px + env(safe-area-inset-bottom,0px));max-width:56
 .bk.vorbei{background:#9BC4BA}
 .bk.rot{background:#D93636}
 .bk.frei{background:#fff;color:#2B8C78;box-shadow:inset 0 0 0 2px #2B8C78,0 0 0 2px #fff}.bk.frei.vorbei{color:#9BC4BA;box-shadow:inset 0 0 0 2px #9BC4BA}
+.bk.anreise{background:#BFE8D8;color:#1E6E5C}.bk.anreise.vorbei{background:#E3F2EC;color:#8FBFB0}
+.z.anreise{color:#1E6E5C}
 .z .pz{display:inline-flex;align-items:center;gap:3px;margin-left:6px;font-weight:700}
 .bk.ueber,.bk.ueber.vorbei{background:repeating-linear-gradient(135deg,#D93636 0 7px,#B42525 7px 14px)}
 .kal::-webkit-scrollbar{height:0}
