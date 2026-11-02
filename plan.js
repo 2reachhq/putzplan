@@ -21,13 +21,15 @@
     s.src='https://docs.google.com/spreadsheets/d/'+C.sheet+'/gviz/tq?sheet='+blatt+'&headers=1&tqx=out:json;responseHandler:'+cb+'&_='+Date.now();
     document.head.appendChild(s)})}
   const wert=(x,i)=>x.c&&x.c[i]&&x.c[i].v!=null?x.c[i].v:null;
+  /* Uhrzeit kommt als Text „14:00“ – liest die Tabelle sie doch als Zeit, kommt [14,0,0,0] */
+  const zeit=v=>v==null||v===''?'':Array.isArray(v)?String(v[0]).padStart(2,'0')+':'+String(v[1]||0).padStart(2,'0'):String(v);
 
   async function laden(){if(laeuft)return;laeuft=true;
     try{const [d,b]=await Promise.all([holen('Daten'),holen('Buchungen').catch(()=>null)]);
       if(!d||!d.table)throw new Error('leer');
       {const l=((d.table.cols||[])[3]||{}).label||'';const m=/(\d{1,2}\.\d{1,2}\.)\S*\s+(\d{1,2}:\d{2})/.exec(l);el('stand').textContent=m?m[1]+' '+m[2]:''}
       daten=(d.table.rows||[]).map(x=>({d:+wert(x,0),art:wert(x,1),text:wert(x,2)})).filter(z=>z.d&&z.text);
-      buch=b&&b.table?(b.table.rows||[]).map(x=>({wg:wert(x,0),an:wert(x,1),ab:wert(x,2),g:wert(x,3),fehlt:+wert(x,4)===1,unsicher:+wert(x,5)===1})).filter(z=>z.wg!=null):[];
+      buch=b&&b.table?(b.table.rows||[]).map(x=>({wg:wert(x,0),an:wert(x,1),ab:wert(x,2),g:wert(x,3),fehlt:+wert(x,4)===1,unsicher:+wert(x,5)===1,frueh:zeit(wert(x,6)),spaet:zeit(wert(x,7)),notiz:wert(x,8)?String(wert(x,8)):''})).filter(z=>z.wg!=null):[];
       zeigen()}
     catch(e){if(!daten)el('inhalt').innerHTML='<div class="hinweis">'+esc(C.t.fehler)+'</div>'}
     finally{laeuft=false}}
@@ -40,14 +42,23 @@
   function putzTage(){const m=new Map();
     for(const b of buch){if(!b.an)continue;const d=b.ab||b.an+1;const k=b.wg+'|'+d;
       const neu=buch.find(o=>o!==b&&o.wg===b.wg&&o.an===d);const x=m.get(k)||{wg:b.wg,d,rot:false};
-      x.neu=x.neu||neu||null;x.g=x.neu?(x.neu.g||null):STANDARD;x.frei=!x.neu;x.rot=x.rot||!b.ab||b.unsicher||(x.neu&&!x.neu.g);m.set(k,x)}
+      x.neu=x.neu||neu||null;x.g=x.neu?(x.neu.g||null):STANDARD;x.frei=!x.neu;x.rot=x.rot||!b.ab||b.unsicher||(x.neu&&!x.neu.g);x.raus=b;m.set(k,x)}
     /* War die Wohnung leer und kommen MEHR als die 2 Standard-Personen, steht am Anreisetag ein hellgrünes „Vorbereiten“ –
        beim letzten Putzen wurde nur für 2 bereitgelegt. Kein Putzen, nur nachlegen. */
     for(const b of buch){if(!b.an||!(+b.g>STANDARD))continue;if(m.has(b.wg+'|'+b.an))continue;
       m.set(b.wg+'|'+b.an+'|an',{wg:b.wg,d:b.an,g:b.g,neu:b,frei:false,rot:false,an:true})}
+    /* Early Check-in oder Notiz bei Anreise in eine leere Wohnung: auch ohne Putzen sichtbar (zum Bereitlegen) */
+    for(const b of buch){if(!b.an||!(b.frueh||b.notiz))continue;if([...m.values()].some(p=>p.wg===b.wg&&p.d===b.an))continue;
+      m.set(b.wg+'|'+b.an+'|an',{wg:b.wg,d:b.an,g:b.g,neu:b,frei:false,rot:false,an:true})}
+    for(const p of m.values()){const r=p.raus||{},n=p.neu||{};p.spaet=r.spaet||'';p.frueh=n.frueh||'';p.notizen=n.notiz?[n.notiz]:[];/* Notiz gilt für die Vorbereitung des Gastes, nicht für seinen Abreisetag */p.info=!!(p.spaet||p.frueh||p.notizen.length)}
     return[...m.values()]}
+  const UHR='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
   const naechte=p=>p.neu&&p.neu.ab&&p.neu.an?p.neu.ab-p.neu.an:null;
   const KAL='<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>';
+  /* Early Check-in, Late Check-out und Notiz direkt unter der Wohnung – groß und farbig, damit es niemand übersieht */
+  const infoZeilen=p=>!p.info?'':'<div class="info">'+(p.spaet?'<span class="ichip spaet">'+UHR+esc(C.t.spaet||'Late check-out')+' '+esc(p.spaet)+'</span>':'')
+    +(p.frueh?'<span class="ichip frueh">'+UHR+esc(C.t.frueh||'Early check-in')+' '+esc(p.frueh)+'</span>':'')
+    +p.notizen.map(t=>'<span class="inotiz">'+esc(t)+'</span>').join('')+'</div>';
   function zeigen(){const heute=tagZahl(new Date());
     const tage=[...new Set(daten.filter(z=>z.art==='tag').map(z=>z.d))].sort((a,b)=>a-b);
     if(!tage.length){el('inhalt').innerHTML='<div class="hinweis">'+esc(C.t.leer)+'</div>';return}
@@ -65,7 +76,7 @@
     const spalte=(z,k)=>z>=von&&z<=bis?'<div class="'+k+'" style="left:'+(W+(z-von)*W)+'px"></div>':'';
     const PT=putzTage();let zeilen='';for(const wg of wgs){let balken='';
       for(const p of PT){if(p.wg!==wg||p.d<von||p.d>bis)continue;
-        balken+='<div class="bk putz'+(p.an?' anreise':p.rot&&p.d>=heute?' rot':p.frei?' frei':'')+(p.d<heute?' vorbei':'')+'" style="left:'+((p.d-von)*W+4)+'px;width:'+(W-8)+'px">'+PERSON+'<b>'+(p.g?esc(p.g):'?')+'</b></div>'}
+        balken+='<div class="bk putz'+(p.an?' anreise':p.rot&&p.d>=heute?' rot':p.frei?' frei':'')+(p.d<heute?' vorbei':'')+'" style="left:'+((p.d-von)*W+4)+'px;width:'+(W-8)+'px">'+(p.info?UHR:PERSON)+'<b>'+(p.g?esc(p.g):'?')+'</b></div>'}
       zeilen+='<div class="r"><div class="lab">'+esc(wg)+'</div><div class="trk" style="width:'+(N*W)+'px">'+balken+'</div></div>'}
     /* Tonnen als eigene Zeile: am Tag vor der Abholung RAUS, am Abholtag wieder REIN – in der Farbe der Tonne */
     const TF={blau:'#2F6FDB',gelb:'#F2C200',grau:'#8A8A8A'};const ton=daten.filter(z=>TF[z.art]&&z.d>=von&&z.d<=bis&&/OUT|RAUS|வெளியே/i.test(z.text));/* nur „raus“ – reinholen ist selbstverständlich */
@@ -82,7 +93,7 @@
     const tonnen=zt.filter(z=>(z.art==='blau'||z.art==='gelb'||z.art==='grau'||z.art==='tonne')&&/OUT|RAUS|வெளியே/i.test(z.text));
     /* Neben den Personen die Nächte, die der neue Gast bleibt */
     const zeil=heuteP.map(p=>{const n=naechte(p);return'<div class="z'+(p.rot?' fehlt':p.an?' anreise':'')+'">WG '+esc(p.wg)+' – '+esc(p.an?(C.t.vorbereiten||'prepare'):C.t.putzen)
-      +' <span class="pz">'+PERSON.replace('width="13" height="13"','width="17" height="17"')+(p.g?esc(p.g):'?')+'</span>'+(n?'<span class="pz">'+KAL+n+'</span>':'')+(p.rot?' ?':'')+'</div>'}).join('')
+      +' <span class="pz">'+PERSON.replace('width="13" height="13"','width="17" height="17"')+(p.g?esc(p.g):'?')+'</span>'+(n?'<span class="pz">'+KAL+n+'</span>':'')+(p.rot?' ?':'')+infoZeilen(p)+'</div>'}).join('')
       +(heuteP.length?'':'<div class="z leer">'+esc(C.t.nichts)+'</div>')
       +tonnen.map(z=>'<div class="z">'+esc(z.text)+'</div>').join('');
     const tagKarte='<section class="tag'+(gewaehlt===heute?' heute':gewaehlt<heute?' vorbei':'')+'"><h2>'+(gewaehlt===heute?'<span class="badge">'+esc(C.t.heute)+'</span>':'')+esc(titel)+'</h2>'+zeil+'</section>';

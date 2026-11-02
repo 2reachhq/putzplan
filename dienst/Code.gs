@@ -27,17 +27,18 @@ const INSERATE={
   'City-Apartment für Familien 5 Per, 8 Min zum Hbf!':['kranz',3],'Zentrales & ruhiges Apartment in Mönchengladbach':['kranz',4],
   '5 Min zur City | 4 Gäste | Ruhige Lage':['poether',1],'5 Min City | Zentral & Ruhig | Komfort für 2 Pers.':['poether',2],
   'Helles Apartment für 4 Personen in ruhiger Lage':['poether',3]};
-const SPALTEN=['id','quelle','code','gast','haus','wg','anreise','abreise','gaeste','status','unterkunft','geaendert','admin','pruefen'];
+const SPALTEN=['id','quelle','code','gast','haus','wg','anreise','abreise','gaeste','status','unterkunft','geaendert','admin','pruefen','frueh','spaet','notiz'];
+/* frueh = Early Check-in (Uhrzeit), spaet = Late Check-out (Uhrzeit), notiz = Hinweis für die Putzkräfte – nur vom Admin, nie aus Mails */
 
 const T={
   en:{wt:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],anz:n=>n?(n===1?'1 guest':n+' guests'):'? guests',
     keinCheckin:'no bookings right now',nichtsZuTun:'nothing to do',farbe:{blau:'blue',gelb:'yellow',grau:'grey'},
     raus:f=>'Bins: '+f+' bin OUT (pickup tomorrow)',rein:f=>'Bins: '+f+' bin back IN',stand:'Updated ',rot:' · red = please ask',
-    morgen:'Tomorrow',heute:'Today',update:'New',putzen:'clean',titel:'Cleaning Plan'},
+    morgen:'Tomorrow',heute:'Today',update:'New',putzen:'clean',titel:'Cleaning Plan',spaet:'late check-out',frueh:'early check-in'},
   ta:{wt:['ஞாயிறு','திங்கள்','செவ்வாய்','புதன்','வியாழன்','வெள்ளி','சனி'],anz:n=>(n||'?')+' பேர்',
     keinCheckin:'இப்போது booking இல்லை',nichtsZuTun:'வேலை இல்லை',farbe:{blau:'நீல',gelb:'மஞ்சள்',grau:'சாம்பல்'},
     raus:f=>f+' குப்பைத் தொட்டியை வெளியே வைக்கவும் (நாளை எடுப்பார்கள்)',rein:f=>f+' குப்பைத் தொட்டியை உள்ளே கொண்டு வரவும்',
-    stand:'Stand ',rot:' · rot = bitte nachfragen',morgen:'நாளை',heute:'இன்று',update:'புதிது',putzen:'சுத்தம் செய்யவும்',titel:'Putzplan'}};
+    stand:'Stand ',rot:' · rot = bitte nachfragen',morgen:'நாளை',heute:'இன்று',update:'புதிது',putzen:'சுத்தம் செய்யவும்',titel:'Putzplan',spaet:'தாமதமான check-out',frueh:'முன்கூட்டிய check-in'}};
 
 /* ---------- Datum (immer deutsche Zeit, nie die des Servers) ---------- */
 const heuteIso=()=>Utilities.formatDate(new Date(),'Europe/Berlin','yyyy-MM-dd');
@@ -146,13 +147,13 @@ function oeffentlichSchreiben(L){L=fuerPutzplan(L);const heute=heuteIso();const 
         R.push([serial(d),fehlt?'fehlt':b.gaeste&&+b.gaeste!==2?'anders':'aufgabe','WG '+(b.wg||'?')+' - '+S.anz(+b.gaeste||null)+' (Out-'+(b.abreise&&!b.unsicher?b.abreise.slice(8)+'.'+b.abreise.slice(5,7):'?')+')','']);z++}
       for(const a of ton(plus(d,1)))if(S.farbe[a]){R.push([serial(d),a,S.raus(S.farbe[a]),'']);z++}
       if(!z)R.push([serial(d),'leer',an.length?S.nichtsZuTun:S.keinCheckin,''])}
-    const B=[['WG','Anreise','Abreise','Gaeste','Fehlt','Unsicher'],...H.wgs.map(w=>[w,'','','','','']),
-      ...aktiv.filter(b=>b.wg&&(b.abreise||b.anreise)>=von&&b.anreise<=ende).map(b=>[+b.wg,serial(b.anreise),b.abreise?serial(b.abreise):'',b.gaeste?+b.gaeste:'',(!b.gaeste||!b.abreise||b.unsicher)&&(b.abreise||b.anreise)>=heute?1:0,b.unsicher?1:0])];
+    const B=[['WG','Anreise','Abreise','Gaeste','Fehlt','Unsicher','Frueh','Spaet','Notiz'],...H.wgs.map(w=>[w,'','','','','','','','']),
+      ...aktiv.filter(b=>b.wg&&(b.abreise||b.anreise)>=von&&b.anreise<=ende).map(b=>[+b.wg,serial(b.anreise),b.abreise?serial(b.abreise):'',b.gaeste?+b.gaeste:'',(!b.gaeste||!b.abreise||b.unsicher)&&(b.abreise||b.anreise)>=heute?1:0,b.unsicher?1:0,b.frueh||'',b.spaet||'',b.notiz||''])];
     const ss=SpreadsheetApp.openById(H.sheet);const hash=Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5,JSON.stringify([R,B]),Utilities.Charset.UTF_8));
     if(P.getProperty('hash_'+hk)!==hash){
       const dSh=ss.getSheetByName('Daten');dSh.getRange('A2:C3000').clearContent();dSh.getRange(1,1,1,3).setValues([['Datum','Art','Text']]);
       dSh.getRange(2,1,R.length,3).setValues(R.map(r=>r.slice(0,3)));
-      const bSh=ss.getSheetByName('Buchungen');bSh.getRange('A1:F600').clearContent();bSh.getRange(1,1,B.length,6).setValues(B);
+      const bSh=ss.getSheetByName('Buchungen');bSh.getRange('A1:I600').clearContent();bSh.getRange(1,7,600,3).setNumberFormat('@');/* Uhrzeiten als Text, sonst macht die Tabelle daraus eine Zeit */bSh.getRange(1,1,B.length,9).setValues(B);
       P.setProperty('hash_'+hk,hash)}
     ss.getSheetByName('Daten').getRange('D1').setValue(S.stand+jetzt+S.rot)}}
 
@@ -160,7 +161,11 @@ function oeffentlichSchreiben(L){L=fuerPutzplan(L);const heute=heuteIso();const 
 function aufgaben(hk,d,L){const S=T[HAEUSER[hk].sprache];const M=muellLesen()[hk]||[];
   const aktiv=fuerPutzplan(L||buchungenLesen()).filter(b=>b.haus===hk&&b.status!=='storniert');
   const ab=aktiv.filter(b=>b.abreise===d&&b.wg);const wgs=[...new Set(ab.map(b=>+b.wg))].sort((a,b)=>a-b);
-  const zeilen=wgs.map(w=>'WG '+w+' – '+S.putzen+(ab.some(b=>+b.wg===w&&b.unsicher)?' (?)':''));
+  const zeilen=wgs.map(w=>{const raus=ab.filter(b=>+b.wg===w);const rein=aktiv.filter(b=>b.anreise===d&&+b.wg===w);
+    const zus=[...raus.filter(b=>b.spaet).map(b=>S.spaet+' '+b.spaet),...rein.filter(b=>b.frueh).map(b=>S.frueh+' '+b.frueh),...rein.filter(b=>b.notiz).map(b=>b.notiz)];
+    return'WG '+w+' – '+S.putzen+(raus.some(b=>b.unsicher)?' (?)':'')+(zus.length?' · '+zus.join(' · '):'')});
+  /* Early Check-in in eine leere Wohnung (kein Putzen an dem Tag): trotzdem melden, damit vorher bereitgelegt wird */
+  aktiv.filter(b=>b.anreise===d&&b.wg&&(b.frueh||b.notiz)&&!wgs.includes(+b.wg)).forEach(b=>zeilen.push('WG '+b.wg+' – '+[b.frueh?S.frueh+' '+b.frueh:'',b.notiz||''].filter(Boolean).join(' · ')));
   M.filter(x=>x.datum===plus(d,1)&&S.farbe[x.art]).forEach(x=>zeilen.push(S.raus(S.farbe[x.art])));
   return zeilen}
 /* Meldungstext für einen Tag. Der Push selbst kommt ohne Inhalt; der Service Worker holt sich danach den zuletzt
@@ -214,7 +219,9 @@ function doPost(e){let x={};try{x=JSON.parse(e.postData.contents)}catch(err){ret
     try{const L=buchungenLesen();const fertig=[];const jetzt=new Date().toISOString();
       for(const a of x.aenderungen||[]){let b=/^neu/.test(a.id||'')?null:L.find(o=>o.id===a.id);
         if(!b){if(!/^neu/.test(a.id||''))continue;b={id:'man-'+Date.now()+'-'+fertig.length,quelle:'direkt',status:'bestaetigt'};SPALTEN.forEach(k=>{if(b[k]==null)b[k]=''});L.push(b)}
-        const vorher=b.abreise;const f=a.felder||{};for(const k of['haus','wg','anreise','abreise','gaeste','status','gast'])if(k in f){let v=f[k];
+        const vorher=b.abreise;const f=a.felder||{};for(const k of['haus','wg','anreise','abreise','gaeste','status','gast','frueh','spaet','notiz'])if(k in f){let v=f[k];
+          if(k==='frueh'||k==='spaet'){v=/^\d{1,2}:\d{2}$/.test(String(v||''))?String(v):'';b[k]=v;continue}
+          if(k==='notiz'){b[k]=String(v||'').replace(/[\r\n]+/g,' ').trim().slice(0,200);continue}
           if(k==='haus'&&!HAEUSER[v])continue;if((k==='anreise'||k==='abreise')&&v&&!/^\d{4}-\d{2}-\d{2}$/.test(v))continue;
           if(k==='wg'||k==='gaeste')v=v===''||v==null?'':Math.max(0,Math.min(40,parseInt(v,10)||0))||'';if(k==='status'&&v!=='storniert')v='bestaetigt';
           if(k==='gast')v=String(v||'').slice(0,80);b[k]=v}
