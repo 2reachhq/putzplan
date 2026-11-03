@@ -107,7 +107,8 @@ main{padding-bottom:120px}
     if(Array.isArray(g)){const s=new Set(g);for(const b of daten.buchungen)if(!s.has(b.id)&&!/^man-/.test(b.id))neuJetzt.add(b.id)}
     try{localStorage.setItem(NEU_KEY,JSON.stringify(daten.buchungen.map(b=>b.id)))}catch(e){}}
   /* ---------- Stand = Server + noch nicht veröffentlichte Änderungen ---------- */
-  const stand=b=>{const f=(offen.get(b.id)||{}).felder||{};return{...b,...f,...(f.geprueft?{pruefen:''}:{})}};
+  /* Gelb nur für Aufenthalte, die noch kommen oder laufen – ein vorbeigegangener braucht keine Prüfung mehr */
+  const stand=b=>{const f=(offen.get(b.id)||{}).felder||{};const x={...b,...f,...(f.geprueft?{pruefen:''}:{})};if(x.pruefen&&x.abreise&&x.abreise<daten.heute)x.pruefen='';return x};
   const alle=()=>daten.buchungen.map(stand).filter(b=>b.status!=='storniert'||offen.has(b.id));
   const fehlt=b=>b.status!=='storniert'&&(!b.gaeste||!b.abreise||!b.wg||!b.haus)&&(b.abreise||b.anreise||'9')>=daten.heute;
   const hausVon=id=>daten.haeuser.find(h=>h.id===id);

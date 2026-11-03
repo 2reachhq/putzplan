@@ -92,8 +92,13 @@ function buchungenSchreiben(L){const sh=blatt('Buchungen');L.sort((a,b)=>(a.anre
 function zusammen(L,x){let b=L.find(o=>o.id===x.id);const neu=!b;if(neu){b={id:x.id};SPALTEN.forEach(k=>{if(b[k]==null)b[k]=''});L.push(b)}let w=neu;
   /* Änderungs-Mail: Die neuen Daten stehen nicht drin – Buchung zum Prüfen markieren. Booking nennt im Betreff die (neue)
      Anreise: weicht sie ab, gilt sie, und die Abreise ist unbekannt (rot), bis sie im Admin eingetragen ist. */
-  if(x.pruefen){b.pruefen=new Date().toISOString();w=true;if(x.aenderung&&x.anreise&&b.anreise&&b.anreise!==x.anreise){b.anreise=x.anreise;b.abreise=''}
-    if(!b.status)b.status='bestaetigt';x={id:x.id,quelle:x.quelle,code:x.code,unterkunft:x.unterkunft}}
+  /* Was im Admin schon „Geprüft“ ist, bleibt geprüft: Eine Änderungs-Mail, die VOR dem letzten Speichern im Admin kam,
+     macht die Buchung nie wieder gelb und setzt auch keine Daten zurück (sonst holte ein späterer Abgleich mit größerem
+     Zeitfenster alte Mails wieder hoch – am 03.11.2026 wurden so vier Oktober-Buchungen erneut gelb). Und ein Aufenthalt,
+     der schon vorbei ist, braucht keine Prüfung mehr. Gelb wird nur, was wirklich NEU ist. */
+  if(x.pruefen){const schonGeprueft=!!(b.admin&&x.mailZeit&&x.mailZeit<=Date.parse(b.admin));const vorbei=!!(b.abreise&&b.abreise<heuteIso());
+    if(!schonGeprueft&&!vorbei){b.pruefen=new Date().toISOString();w=true;if(x.aenderung&&x.anreise&&b.anreise&&b.anreise!==x.anreise){b.anreise=x.anreise;b.abreise=''}}
+    if(!b.status){b.status='bestaetigt';w=true}x={id:x.id,quelle:x.quelle,code:x.code,unterkunft:x.unterkunft}}
   for(const k in x){const v=x[k];if(k==='id'||v==null||v==='')continue;
     if(k==='status'){if(v==='storniert'&&b.status!=='storniert'){b.status='storniert';w=true}else if(!b.status){b.status=v;w=true}continue}
     if(SPALTEN.includes(k)&&(b[k]==null||b[k]==='')){b[k]=v;w=true}}
@@ -115,7 +120,7 @@ function abgleich(tage){const lock=LockService.getScriptLock();if(!lock.tryLock(
     neu.sort((a,b)=>a[1].getDate().getTime()-b[1].getDate().getTime());
     for(const[art,msg]of neu){const m={subject:msg.getSubject(),text:msg.getPlainBody(),datum:msg.getDate().getTime(),von:msg.getFrom()};let x=null;
       try{x=art==='ab'?leseAirbnb(m):art==='bk'?leseBooking(m):leseBookingNachricht(m)}catch(e){console.error(e)}
-      if(x){const vorher=(L.find(o=>o.id===x.id)||{}).abreise;if(zusammen(L,x)){n++;geaendert.push(Object.assign({},L.find(o=>o.id===x.id),{alteAbreise:vorher}))}}}
+      if(x){x.mailZeit=m.datum;const vorher=(L.find(o=>o.id===x.id)||{}).abreise;if(zusammen(L,x)){n++;geaendert.push(Object.assign({},L.find(o=>o.id===x.id),{alteAbreise:vorher}))}}}
     if(neuGesehen.length){const ab=sh.getLastRow()+1;const fehlt=ab+neuGesehen.length-1-sh.getMaxRows();if(fehlt>0)sh.insertRowsAfter(sh.getMaxRows(),fehlt+100);
       sh.getRange(ab,1,neuGesehen.length,1).setNumberFormat('@').setValues(neuGesehen)}
     if(n)buchungenSchreiben(L);
