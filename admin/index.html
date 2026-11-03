@@ -53,8 +53,9 @@ main{padding-bottom:120px}
 .feld textarea{font:inherit;font-size:16px;padding:10px 12px;border-radius:12px;border:1px solid #DADADA;background:#fff;resize:vertical;min-height:52px}
 .bk .uhr{display:inline-flex;margin-left:3px;opacity:.95}
 .extlink{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:12px;border:0;background:#161616;color:#fff;font-size:15px;font-weight:600;text-decoration:none}
+.zeiten{display:flex;gap:16px;align-items:flex-end}.st.de b{color:#FF3D00}
 </style></head>
-<body><header><div class="kz"><div><span class="ort">Admin</span><h1>Buchungen</h1></div><div class="st"><span>Stand</span><b id="stand"></b></div></div></header>
+<body><header><div class="kz"><div><span class="ort">Admin</span><h1>Buchungen</h1></div><div class="zeiten"><div class="st de"><span>Deutschland</span><b id="dezeit"></b></div><div class="st"><span>Stand</span><b id="stand"></b></div></div></div></header>
 <main id="app"><div class="hinweis">…</div></main>
 <div class="unten" id="unten" hidden><div class="innen"><div class="meldung" id="meldung"></div><button class="knopf" id="pub" disabled>Veröffentlichen</button></div></div>
 <dialog class="blatt" id="blatt"><form class="in" id="blattForm" method="dialog"></form></dialog>
@@ -71,6 +72,13 @@ main{padding-bottom:120px}
   let daten=null;const offen=new Map();let neuNr=0,scrollX=null;
   const dienst=o=>fetch(D,{method:'POST',body:JSON.stringify({...o,pin})}).then(r=>r.json());
   const WT=['So','Mo','Di','Mi','Do','Fr','Sa'];
+  /* Alle Zeiten nach deutscher Zeit – der Admin wird auch aus dem Ausland (Thailand) bedient */
+  const deUhr=()=>new Date().toLocaleTimeString('de-DE',{timeZone:'Europe/Berlin',hour:'2-digit',minute:'2-digit'});
+  const deIso=()=>{const t={};for(const x of new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Berlin',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()))t[x.type]=x.value;return t.year+'-'+t.month+'-'+t.day};
+  const deTick=()=>{const e=document.getElementById('dezeit');if(e)e.textContent=new Date().toLocaleString('de-DE',{timeZone:'Europe/Berlin',weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).replace(',','')};
+  deTick();setInterval(deTick,15000);
+  /* Über Mitternacht (deutsche Zeit) offen gelassen: beim Zurückkommen neu laden – aber nie, solange Ungespeichertes offen ist */
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){deTick();if(typeof daten!=='undefined'&&daten&&daten.heute&&daten.heute!==deIso()&&!offen.size)laden()}});
   const plus=(s,n)=>{const d=new Date(s+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
   const tage=(a,b)=>Math.round((Date.parse(b+'T12:00:00Z')-Date.parse(a+'T12:00:00Z'))/864e5);
   const dat=s=>s?WT[new Date(s+'T12:00:00Z').getUTCDay()]+' '+s.slice(8)+'.'+s.slice(5,7)+'.':'?';
@@ -86,9 +94,9 @@ main{padding-bottom:120px}
       const r=await dienst({typ:'login'}).catch(()=>null);if(r&&r.ok){try{localStorage.setItem('putzplan.pin',pin);localStorage.setItem('putzplan.pinBis',String(Date.now()+TAGE7))}catch(e){}laden()}else anmelden(r?'PIN falsch (nach 5 Fehlversuchen 1 Stunde gesperrt).':'Keine Verbindung.')}}
 
   async function laden(){const r=await dienst({typ:'liste'}).catch(()=>null);if(!r||!r.ok){anmelden(r&&r.fehler==='passwort'?'':'Keine Verbindung.');return}
-    daten=r;offen.clear();unten.hidden=false;zeigen();const st=document.getElementById('stand');st.textContent=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+    daten=r;offen.clear();unten.hidden=false;zeigen();const st=document.getElementById('stand');st.textContent=deUhr();
     /* Beim Öffnen sofort Gmail abgleichen (im Hintergrund) und danach neu laden – nicht erst auf den 5-Minuten-Lauf warten */
-    if(!laden.auto){laden.auto=true;st.textContent='Gmail …';await dienst({typ:'abgleich'}).catch(()=>null);if(!offen.size)await laden();else st.textContent=new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}}
+    if(!laden.auto){laden.auto=true;st.textContent='Gmail …';await dienst({typ:'abgleich'}).catch(()=>null);if(!offen.size)await laden();else st.textContent=deUhr()}}
 
   /* ---------- Stand = Server + noch nicht veröffentlichte Änderungen ---------- */
   const stand=b=>{const f=(offen.get(b.id)||{}).felder||{};return{...b,...f,...(f.geprueft?{pruefen:''}:{})}};

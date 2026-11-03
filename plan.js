@@ -6,6 +6,9 @@
 (function(){
   const C=window.PLAN;const el=id=>document.getElementById(id);const W=48;/* Tagesbreite; Balken laufen von Mitte Anreisetag bis Mitte Abreisetag, mit klarer Lücke dazwischen */
   const tagZahl=d=>Math.round((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())-Date.UTC(1899,11,30))/864e5);
+  /* „Heute“ immer nach deutscher Zeit – nicht nach der Uhr des Handys (sonst springt der Plan z. B. in Thailand 6 Std. zu früh auf den nächsten Tag) */
+  const berlinTag=()=>{const t={};for(const x of new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Berlin',year:'numeric',month:'numeric',day:'numeric'}).formatToParts(new Date()))t[x.type]=+x.value;
+    return Math.round((Date.UTC(t.year,t.month-1,t.day)-Date.UTC(1899,11,30))/864e5)};
   const ausZahl=z=>new Date(Date.UTC(1899,11,30)+z*864e5);
   const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const HAUS='<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>';
@@ -59,7 +62,7 @@
   const infoZeilen=p=>!p.info?'':'<div class="info">'+(p.spaet?'<span class="ichip spaet">'+UHR+esc(C.t.spaet||'Late check-out')+' '+esc(p.spaet)+'</span>':'')
     +(p.frueh?'<span class="ichip frueh">'+UHR+esc(C.t.frueh||'Early check-in')+' '+esc(p.frueh)+'</span>':'')
     +p.notizen.map(t=>'<span class="inotiz">'+esc(t)+'</span>').join('')+'</div>';
-  function zeigen(){const heute=tagZahl(new Date());
+  function zeigen(){const heute=berlinTag();
     const tage=[...new Set(daten.filter(z=>z.art==='tag').map(z=>z.d))].sort((a,b)=>a-b);
     if(!tage.length){el('inhalt').innerHTML='<div class="hinweis">'+esc(C.t.leer)+'</div>';return}
     const von=tage[0],bis=tage[tage.length-1],N=bis-von+1;
