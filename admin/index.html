@@ -52,6 +52,7 @@ main{padding-bottom:120px}
 .putzinfo{background:#F4FAF8;border:1px solid #CFE7DF;border-radius:14px;padding:10px 12px 12px}.pih{font-size:12px;font-weight:700;color:#1E6E5C;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
 .feld textarea{font:inherit;font-size:16px;padding:10px 12px;border-radius:12px;border:1px solid #DADADA;background:#fff;resize:vertical;min-height:52px}
 .bk .uhr{display:inline-flex;margin-left:3px;opacity:.95}
+.bk .neu{margin-left:3px;font-size:12px;line-height:1}
 .extlink{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:12px;border:0;background:#161616;color:#fff;font-size:15px;font-weight:600;text-decoration:none}
 .zeiten{display:flex;gap:16px;align-items:flex-end}.st.de b{color:#FF3D00}
 </style></head>
@@ -94,10 +95,17 @@ main{padding-bottom:120px}
       const r=await dienst({typ:'login'}).catch(()=>null);if(r&&r.ok){try{localStorage.setItem('putzplan.pin',pin);localStorage.setItem('putzplan.pinBis',String(Date.now()+TAGE7))}catch(e){}laden()}else anmelden(r?'PIN falsch (nach 5 Fehlversuchen 1 Stunde gesperrt).':'Keine Verbindung.')}}
 
   async function laden(){const r=await dienst({typ:'liste'}).catch(()=>null);if(!r||!r.ok){anmelden(r&&r.fehler==='passwort'?'':'Keine Verbindung.');return}
-    daten=r;offen.clear();unten.hidden=false;zeigen();const st=document.getElementById('stand');st.textContent=deUhr();
+    daten=r;neueMerken();offen.clear();unten.hidden=false;zeigen();const st=document.getElementById('stand');st.textContent=deUhr();
     /* Beim Öffnen sofort Gmail abgleichen (im Hintergrund) und danach neu laden – nicht erst auf den 5-Minuten-Lauf warten */
     if(!laden.auto){laden.auto=true;st.textContent='Gmail …';await dienst({typ:'abgleich'}).catch(()=>null);if(!offen.size)await laden();else st.textContent=deUhr()}}
 
+  /* Neue Buchungen bekommen ✨ neben der Personenzahl – nur bei diesem Öffnen; beim nächsten Mal sind sie „gesehen“.
+     Gemerkt wird je Gerät (localStorage). Erster Besuch ohne Merkliste: alles gilt als gesehen, sonst funkelt der ganze Kalender.
+     Selbst angelegte Einträge (man-…) funkeln nie. */
+  const NEU_KEY='putzplan.gesehen';const neuJetzt=new Set();
+  function neueMerken(){let g=null;try{g=JSON.parse(localStorage.getItem(NEU_KEY)||'null')}catch(e){}
+    if(Array.isArray(g)){const s=new Set(g);for(const b of daten.buchungen)if(!s.has(b.id)&&!/^man-/.test(b.id))neuJetzt.add(b.id)}
+    try{localStorage.setItem(NEU_KEY,JSON.stringify(daten.buchungen.map(b=>b.id)))}catch(e){}}
   /* ---------- Stand = Server + noch nicht veröffentlichte Änderungen ---------- */
   const stand=b=>{const f=(offen.get(b.id)||{}).felder||{};return{...b,...f,...(f.geprueft?{pruefen:''}:{})}};
   const alle=()=>daten.buchungen.map(stand).filter(b=>b.status!=='storniert'||offen.has(b.id));
@@ -119,7 +127,7 @@ main{padding-bottom:120px}
       const enden=[];lst.forEach(o=>{let l=enden.findIndex(e=>e<=o.b.anreise);if(l<0){l=enden.length;enden.push('')}enden[l]=o.ab;o.l=l});const nl=enden.length;
       for(const o of lst){const b=o.b,ab=o.ab;
         const x=(tage(von,b.anreise)+.5)*W+5,wd=tage(b.anreise,ab)*W-10;/* wie bei Airbnb: von Mitte Anreisetag bis Mitte Abreisetag */const cls=ueberVon(b).length?' ueber':b.pruefen?' pruefen':fehlt(b)?' rot':'';/* gelb vor rot: der Gast hat geändert, die Mail nennt die neuen Daten nicht */
-        bars+='<div class="bk'+cls+(offen.has(b.id)?' offen':'')+(ab<=heute?' vorbei':'')+'" data-id="'+esc(b.id)+'" style="left:'+x+'px;width:'+wd+'px'+(nl>1?';top:'+(9+o.l*40)+'px;transform:none':'')+'"><b>'+(b.gaeste?esc(b.gaeste):'?')+'</b>'+(b.frueh||b.spaet||b.notiz?'<span class="uhr" title="Hinweis für Putzkräfte"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>':'')+'</div>'}
+        bars+='<div class="bk'+cls+(offen.has(b.id)?' offen':'')+(ab<=heute?' vorbei':'')+'" data-id="'+esc(b.id)+'" style="left:'+x+'px;width:'+wd+'px'+(nl>1?';top:'+(9+o.l*40)+'px;transform:none':'')+'"><b>'+(b.gaeste?esc(b.gaeste):'?')+'</b>'+(neuJetzt.has(b.id)?'<span class="neu" title="Neue Buchung">✨</span>':'')+(b.frueh||b.spaet||b.notiz?'<span class="uhr" title="Hinweis für Putzkräfte"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>':'')+'</div>'}
       z+='<div class="r"><div class="lab"><b>'+w+'</b><small>'+esc((h.namen||{})[w]||'')+'</small></div><div class="trk" data-haus="'+h.id+'" data-wg="'+w+'" style="width:'+(N*W)+'px'+(nl>1?';height:'+(12+nl*40)+'px':'')+'">'+bars+'</div></div>'}
     const ti=tage(von,heute);
     return '<div class="haus">'+esc(h.name)+'</div><div class="karte adm"><div class="kal"><div class="kin" style="width:'+(LAB+N*W)+'px">'
@@ -134,7 +142,7 @@ main{padding-bottom:120px}
     const zeile=(b,k)=>{const h=hausVon(b.haus);return '<div class="zeile '+k+'" data-id="'+esc(b.id)+'"><div><b>'+dat(b.anreise)+' → '+dat(b.abreise)+'</b><div class="klein">'+esc(h?h.name.replace(/ \d+$/,''):'?')+' · WG '+esc(b.wg||'?')+' · '+esc(b.gast||'ohne Name')+'</div></div><span class="klein">'+(k==='rot'?'fehlt':k==='ueber'?'überschneidet sich':'geändert')+' ›</span></div>'};
     app.innerHTML='<div class="leiste"><button class="knopf hell" data-a="abgleich">Gmail jetzt abgleichen</button><button class="knopf hell" data-a="abmelden">Abmelden</button></div>'
       +daten.haeuser.map(h=>kalender(h,von,N)).join('')
-      +'<div class="legende"><span><i style="background:#2B8C78"></i>Personen</span><span><i style="background:#D93636"></i>fehlt</span><span><i style="background:#F5C400"></i>vom Gast geändert</span></div>'
+      +'<div class="legende"><span><i style="background:#2B8C78"></i>Personen</span><span><i style="background:#D93636"></i>fehlt</span><span><i style="background:#F5C400"></i>vom Gast geändert</span><span>✨ neu</span></div>'
       +'<div class="klein" style="margin:8px 4px">Buchung antippen = ändern oder verlängern. Leeren Tag antippen = blockieren.</div>'
       +(ueber.length?'<div class="abschnitt rot">Überschneidung – eine davon ist vermutlich storniert oder verlegt ('+ueber.length+')</div>'+ueber.map(b=>zeile(b,'ueber')).join(''):'')
       +(rot.length?'<div class="abschnitt rot">Fehlt etwas ('+rot.length+')</div>'+rot.map(b=>zeile(b,'rot')).join(''):'')
