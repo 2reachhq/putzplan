@@ -80,7 +80,7 @@ function leseBookingNachricht(m){const t=String(m.text||'').replace(/\r/g,'');co
     unterkunft:(/hotel_id=(\d+)/.exec(flach)||[])[1]||feld('Unterkunftsname')}}
 
 /* ---------- Verwaltungstabelle ---------- */
-const KOEPFE={Abos:['endpoint','haus','seit'],Muell:['haus','datum','art'],Putzkosten:['monat','daten','geaendert'],Lohn:['id','datum','haus','monat','betrag','notiz','erfasst']};
+const KOEPFE={Abos:['endpoint','haus','seit'],Muell:['haus','datum','art'],Putzkosten:['monat','daten','geaendert']};
 function blatt(name){const ss=SpreadsheetApp.openById(VERWALTUNG_ID);let sh=ss.getSheetByName(name);
   if(!sh){sh=ss.insertSheet(name);if(KOEPFE[name])sh.getRange(1,1,1,KOEPFE[name].length).setValues([KOEPFE[name]])}return sh}
 function buchungenLesen(){const sh=blatt('Buchungen');const v=sh.getDataRange().getDisplayValues();const L=[];
@@ -177,42 +177,20 @@ function kostenPruefen(d){d=d||{};const preise={};const ersteHaus=Object.keys(HA
   for(const k in (d.preise||{})){const m=/^([a-z]+)-(\d+)$/.exec(k);if(!m||!HAEUSER[m[1]]||HAEUSER[m[1]].wgs.indexOf(+m[2])<0)continue;
     const n=Number(d.preise[k]);if(isFinite(n)&&n>=0&&n<=1000)preise[k]=Math.round(n*100)/100}
   const extras=(Array.isArray(d.extras)?d.extras:[]).slice(0,60).map(x=>{x=x||{};const n=Number(x.betrag);
-    return{text:String(x.text||'').replace(/[\r\n]+/g,' ').trim().slice(0,120),haus:HAEUSER[x.haus]?x.haus:ersteHaus,betrag:isFinite(n)?Math.max(-100000,Math.min(100000,Math.round(n*100)/100)):0}})
+    return{text:String(x.text||'').replace(/[\r\n]+/g,' ').trim().slice(0,120),haus:HAEUSER[x.haus]?x.haus:ersteHaus,betrag:isFinite(n)?Math.max(-100000,Math.min(100000,Math.round(n*100)/100)):0,bezahlt:!!x.bezahlt}})
     .filter(x=>x.text||x.betrag);
-  return{preise:preise,extras:extras}}
+  /* Je Reinigung (Haus|WG|Tag): „bezahlt“ oder „aus“ (zählt nicht); offen = kein Eintrag */
+  const status={};let n=0;for(const k in (d.status||{})){const m=/^([a-z]+)\|(\d+)\|(\d{4}-\d{2}-\d{2})$/.exec(k);const v=d.status[k];
+    if(!m||!HAEUSER[m[1]]||HAEUSER[m[1]].wgs.indexOf(+m[2])<0||(v!=='bezahlt'&&v!=='aus')||++n>500)continue;status[k]=v}
+  return{preise:preise,extras:extras,status:status}}
 function kostenSchreiben(monat,d){const sh=blatt('Putzkosten');const v=sh.getDataRange().getDisplayValues();
   let r=-1;for(let i=1;i<v.length;i++)if(v[i][0]===monat){r=i+1;break}if(r<0)r=Math.max(sh.getLastRow(),1)+1;
   sh.getRange(r,1,1,3).setNumberFormat('@').setValues([[monat,JSON.stringify(d),new Date().toISOString()]])}
 /* Noch nichts eingetragen: die Preise des letzten Monats mit Preisen als Vorschlag (gespeichert wird erst bei einer Änderung) */
 const vorlageFuer=(K,monat)=>{const f=Object.keys(K).filter(k=>k<monat&&K[k]&&K[k].preise&&Object.keys(K[k].preise).length).sort().pop();return f?K[f].preise:null};
 const haeuserListe=()=>Object.keys(HAEUSER).map(k=>({id:k,name:HAEUSER[k].name,wgs:HAEUSER[k].wgs,namen:HAEUSER[k].namen}));
-function putzkosten(monat){const K=kostenLesen();const gezahlt={};for(const z of lohnLesen())if(z.monat===monat)gezahlt[z.haus]=Math.round(((gezahlt[z.haus]||0)+z.betrag)*100)/100;
-  return{ok:true,monat:monat,heute:heuteIso(),haeuser:haeuserListe(),putzen:putzenImMonat(monat),daten:K[monat]||null,vorlage:vorlageFuer(K,monat),gezahlt:gezahlt}}
-/* Zu zahlen je Haus in einem Monat: NUR Reinigungen, die schon gemacht sind (Abreise bis heute) × Preis + Zusatzposten */
-function sollMonat(monat,K,L,heute){const d=K[monat]||{};const preise=d.preise||vorlageFuer(K,monat)||{};const S={};for(const k in HAEUSER)S[k]=0;
-  for(const p of putzenImMonat(monat,L))if(p.datum<=heute)S[p.haus]+=+preise[p.haus+'-'+p.wg]||0;
-  for(const x of d.extras||[])if(S[x.haus]!=null)S[x.haus]+=+x.betrag||0;
-  for(const k in S)S[k]=Math.round(S[k]*100)/100;return S}
-
-/* ---------- Lohn: tatsächlich gezahlte Beträge (Blatt „Lohn“, eine Zeile je Zahlung) ---------- */
-function lohnLesen(){const v=blatt('Lohn').getDataRange().getDisplayValues();const Z=[];
-  for(let i=1;i<v.length;i++){const[id,datum,haus,monat,betrag,notiz]=v[i];if(!id)continue;Z.push({id:id,datum:datum,haus:haus,monat:monat,betrag:Number(betrag)||0,notiz:notiz||''})}return Z}
-function lohnUebersicht(){const heute=heuteIso();const Z=lohnLesen();const K=kostenLesen();const L=buchungenLesen();
-  /* Monate: vom ersten Monat mit Preisen oder Zahlung (höchstens 24 zurück) bis zum aktuellen */
-  const jetzt=heute.slice(0,7);const erste=[...Object.keys(K),...Z.map(z=>z.monat)].filter(m=>/^\d{4}-\d{2}$/.test(m)).sort()[0]||jetzt;
-  const M=[];for(let m=jetzt;M.length<24;m=monatPlus(m,-1)){M.push(m);if(m<=erste)break}
-  return{ok:true,heute:heute,haeuser:haeuserListe(),zahlungen:Z.sort((a,b)=>b.datum.localeCompare(a.datum)||b.id.localeCompare(a.id)),
-    monate:M.map(m=>({monat:m,soll:sollMonat(m,K,L,heute)}))}}
-const monatPlus=(m,n)=>{let y=+m.slice(0,4),mo=+m.slice(5)+n;while(mo<1){mo+=12;y--}while(mo>12){mo-=12;y++}return y+'-'+String(mo).padStart(2,'0')};
-function lohnPruefen(z){z=z||{};const n=Number(z.betrag);
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(z.datum||''))||!HAEUSER[z.haus]||!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(z.monat||''))||!isFinite(n)||n===0||Math.abs(n)>100000)return null;
-  return{id:/^z[0-9a-z]{6,30}$/.test(String(z.id||''))?z.id:'z'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
-    datum:z.datum,haus:z.haus,monat:z.monat,betrag:Math.round(n*100)/100,notiz:String(z.notiz||'').replace(/[\r\n]+/g,' ').trim().slice(0,120)}}
-function lohnSchreiben(z,loeschen){const sh=blatt('Lohn');const v=sh.getDataRange().getDisplayValues();let r=-1;
-  for(let i=1;i<v.length;i++)if(v[i][0]===z.id){r=i+1;break}
-  if(loeschen){if(r>0)sh.deleteRow(r);return}
-  if(r<0)r=Math.max(sh.getLastRow(),1)+1;
-  sh.getRange(r,1,1,7).setNumberFormat('@').setValues([[z.id,z.datum,z.haus,z.monat,String(z.betrag),z.notiz,new Date().toISOString()]])}
+function putzkosten(monat){const K=kostenLesen();
+  return{ok:true,monat:monat,heute:heuteIso(),haeuser:haeuserListe(),putzen:putzenImMonat(monat),daten:K[monat]||null,vorlage:vorlageFuer(K,monat)}}
 
 /* ---------- Was ist an einem Tag zu tun (Push-Meldung) ---------- */
 function aufgaben(hk,d,L){const S=T[HAEUSER[hk].sprache];const M=muellLesen()[hk]||[];
@@ -272,14 +250,6 @@ function doPost(e){let x={};try{x=JSON.parse(e.postData.contents)}catch(err){ret
   if(x.typ==='putzkosten'){if(!MONAT.test(String(x.monat||'')))return json({fehler:'monat'});return json(putzkosten(x.monat))}
   if(x.typ==='putzkostenSpeichern'){if(!MONAT.test(String(x.monat||'')))return json({fehler:'monat'});
     const lock=LockService.getScriptLock();lock.waitLock(20000);try{const d=kostenPruefen(x.daten);kostenSchreiben(x.monat,d);return json({ok:true,daten:d})}finally{lock.releaseLock()}}
-  if(x.typ==='lohn')return json(lohnUebersicht());
-  if(x.typ==='lohnSpeichern'||x.typ==='lohnLoeschen'){const z=x.typ==='lohnLoeschen'?{id:String(x.id||'')}:lohnPruefen(x.zahlung);
-    if(!z||!z.id)return json({fehler:'eingabe'});const lock=LockService.getScriptLock();lock.waitLock(20000);
-    try{lohnSchreiben(z,x.typ==='lohnLoeschen');return json(lohnUebersicht())}finally{lock.releaseLock()}}
-  if(x.typ==='liste'){const ab=plus(heuteIso(),-14);return json({ok:true,heute:heuteIso(),haeuser:Object.keys(HAEUSER).map(k=>({id:k,name:HAEUSER[k].name,wgs:HAEUSER[k].wgs,namen:HAEUSER[k].namen})),
-    buchungen:ergaenzen(buchungenLesen()).filter(b=>b.status!=='storniert'&&(b.abreise||b.anreise)>=ab)})}
-  /* Veröffentlichen: alle Änderungen der Admin-Seite auf einmal – danach EINMAL die Tabellen neu schreiben.
-     Jede Änderung: {id, felder}; eine neue Buchung kommt mit id 'neu…'. */
   if(x.typ==='veroeffentlichen'){const lock=LockService.getScriptLock();lock.waitLock(20000);
     try{const L=buchungenLesen();const fertig=[];const jetzt=new Date().toISOString();
       for(const a of x.aenderungen||[]){let b=/^neu/.test(a.id||'')?null:L.find(o=>o.id===a.id);

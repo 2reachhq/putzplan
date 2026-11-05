@@ -77,14 +77,20 @@ main{padding-bottom:120px}
 .kbetrag{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
 .ksum{display:flex;justify-content:space-between;gap:10px;padding:12px 0 6px;font-weight:700;font-size:16px}.ksum b{font-variant-numeric:tabular-nums}
 .kanz small.grau{color:#8A8A8A}
-.kgez,.lzahlen{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:14px;color:#555;padding:0 0 8px}.kgez b,.lzahlen b{text-align:right;font-variant-numeric:tabular-nums;color:#161616}
-.kgez b.off,.lzahlen b.off{color:#C25E00}.kgez b.ok,.lzahlen b.ok{color:#2B8C78}
-.kd.geplant{color:#9A9A9A}.kd i{font-style:normal;font-size:11px;background:#F0F0F0;border-radius:6px;padding:1px 6px}
-.lz{padding:10px 0;border-bottom:1px solid #F0F0F0}.lz>b{font-size:16px;display:block;margin-bottom:4px}.lz .lzahlen{padding:0}
-.lzeile{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F0F0F0}.lzeile b{font-size:16px;font-variant-numeric:tabular-nums}
+.kgez{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:14px;color:#555;padding:0 0 8px}.kgez b{text-align:right;font-variant-numeric:tabular-nums;color:#161616}
+.kgez b.off{color:#C25E00}.kgez b.ok{color:#2B8C78}
+.kbez{display:flex;gap:14px;font-size:14px;font-weight:600;margin:0 0 4px}.kbez .off{color:#FFB15C}.kbez .ok{color:#7FD8C3}
+.kd2{padding:8px 0;border-top:1px solid #F2F2F2}.kd2.aus .kdk{color:#9A9A9A;text-decoration:line-through}.kd2.geplant{color:#9A9A9A}
+.kdk{display:grid;grid-template-columns:76px 46px minmax(0,1fr);gap:6px;font-size:13px;margin-bottom:6px}.kdk span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.kdk em{font-style:normal;color:#D93636}
+.kd2.geplant .kdk{margin:0}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);background:#F0F0F0;border-radius:10px;padding:3px;gap:3px}
+.seg button{font:inherit;font-size:13px;font-weight:600;border:0;background:none;min-height:36px;border-radius:8px;color:#666;cursor:pointer}
+.seg button.an{background:#fff;color:#161616;box-shadow:0 1px 2px rgba(0,0,0,.12)}.seg button.an.bezahlt{background:#2B8C78;color:#fff}.seg button.an.aus{background:#5A5A5A;color:#fff}
+.kalle{width:100%;margin:2px 0 8px;font-size:14px}
+.kxbez{grid-column:1/-1;display:flex;gap:8px;align-items:center;font-size:14px;color:#555;min-height:36px}.kxbez input{width:20px;height:20px;accent-color:#2B8C78;margin:0}
+.kd2 i{font-style:normal;font-size:11px;background:#F0F0F0;border-radius:6px;padding:1px 6px}
+
 .kdet summary{font-size:14px;color:#1E6E5C;font-weight:600;min-height:40px;display:flex;align-items:center;cursor:pointer}
-.kd{display:grid;grid-template-columns:76px 46px minmax(0,1fr);gap:6px;font-size:13px;padding:6px 0;border-top:1px solid #F5F5F5}
-.kd span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.kd em{font-style:normal;color:#D93636}
 .kx{display:grid;grid-template-columns:minmax(0,1fr) 112px 44px;gap:8px;padding:10px 0;border-bottom:1px solid #F0F0F0;align-items:center}
 .kx .ktext{grid-column:1/-1}
 .kweg{width:44px;height:44px;border:0;border-radius:10px;background:#FDECEC;color:#A51B1B;font-size:20px;cursor:pointer}
@@ -199,72 +205,85 @@ main{padding-bottom:120px}
   /* Buchungsnummer mit einem Tipp in die Zwischenablage; ältere Safari-Fassungen über ein verstecktes Feld */
   function kopieren(t){if(navigator.clipboard&&window.isSecureContext)return navigator.clipboard.writeText(t).then(()=>true,()=>alt());return Promise.resolve(alt());
     function alt(){const f=document.createElement('textarea');f.value=t;f.setAttribute('readonly','');f.style.cssText='position:fixed;top:0;opacity:0';blatt.appendChild(f);f.select();f.setSelectionRange(0,t.length);let ok=false;try{ok=document.execCommand('copy')}catch(e){}f.remove();return ok}}
-  /* ---------- Reiter „Putzkosten“: Reinigungen je Wohnung und Monat × Preis + Zusatzposten ----------
-     Gezählt wird im Dienst, genau wie im Putzplan (jede Abreise = eine Reinigung) – berechnet werden aber NUR die schon
-     gemachten (Abreise bis heute); was im Monat noch kommt, steht nur als Hinweis da (Betreiber: „nur die, die gemacht
-     wurden“). Preise und Zusatzposten stehen im Verwaltungsblatt (Blatt „Putzkosten“), nicht auf dem Gerät. Jede Änderung
-     wird sofort gespeichert. Zusatzposten gehören immer zu einem Haus, damit die Summe je Putzkraft stimmt.
-     Was schon gezahlt ist, kommt aus dem Reiter „Lohn“ (früher ein Haken „ausgezahlt“ – ersetzt, damit es EINE Quelle gibt). */
+  /* ---------- Reiter „Putzkosten“: was an die Putzkräfte zu zahlen ist ----------
+     Gezählt wird im Dienst, genau wie im Putzplan (jede Abreise = eine Reinigung). Berechnet werden NUR Reinigungen,
+     die schon gemacht sind (Abreise bis heute); was im Monat noch kommt, steht grau als „geplant“ da.
+     Jede gemachte Reinigung hat einen Stand: offen · bezahlt · zählt nicht (Betreiber: „auf einzelne Buchungen
+     ausgezahlt oder nicht zählen auswählen – dann brauchen wir kein Feld für extra ausgezahlt“). Ein eigener Reiter
+     „Lohn“ für gezahlte Beträge gab es kurz (05.11.2026) – ersetzt durch diesen Stand je Reinigung, damit es EINE Quelle gibt.
+     Preise, Zusatzposten und Stände stehen im Verwaltungsblatt (Blatt „Putzkosten“), jede Änderung wird sofort gespeichert. */
   const MONATE=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-  let kMonat=null,kDaten=null,kNr=0,kKette=Promise.resolve();
+  let kMonat=null,kDaten=null,kNr=0,kKette=Promise.resolve();const kAuf=new Set();
   const eur=n=>(Math.round((+n||0)*100)/100).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
   const zahlText=n=>n==null||n===''?'':(Number.isInteger(+n)?String(+n):(+n).toFixed(2)).replace('.',',');
   const zahl=s=>{const t=String(s==null?'':s).replace(/[\s€]/g,'');if(!t)return null;const n=parseFloat(t.replace(/\.(?=\d{3}(\D|$))/g,'').replace(',','.'));return isFinite(n)?n:null};
   const monatPlus=(m,n)=>{let[y,mo]=m.split('-').map(Number);mo+=n;while(mo<1){mo+=12;y--}while(mo>12){mo-=12;y++}return y+'-'+String(mo).padStart(2,'0')};
   const monatName=m=>MONATE[+m.slice(5)-1]+' '+m.slice(0,4);
   const kurz=d=>d.slice(8)+'.'+d.slice(5,7)+'.';
-  const REITER=[['buchungen','Buchungen'],['kosten','Putzkosten'],['lohn','Lohn']];
+  const pKey=p=>p.haus+'|'+p.wg+'|'+p.datum;
+  const REITER=[['buchungen','Buchungen'],['kosten','Putzkosten']];
   const reiter=()=>'<div class="reiter" role="tablist">'+REITER.map(([k,t])=>'<button type="button" role="tab" aria-selected="'+(ansicht===k)+'" data-reiter="'+k+'"'+(ansicht===k?' class="an"':'')+'>'+t+'</button>').join('')+'</div>';
   const monatKopf=()=>'<div class="monatwahl"><button type="button" data-k="zurueck" aria-label="Voriger Monat">‹</button><b>'+monatName(kMonat)+'</b><button type="button" data-k="vor" aria-label="Nächster Monat">›</button></div>';
+  const dienstFehler=r=>r&&r.fehler==='typ'?'Der Dienst kennt diesen Reiter noch nicht. Bitte im Skript-Editor die neue Fassung von Code.gs einfügen und eine neue Version bereitstellen.':r&&r.fehler==='passwort'?'Bitte neu anmelden.':'Keine Verbindung. Bitte nochmal versuchen.';
   function reiterWechsel(k){if(k===ansicht)return;ansicht=k;document.querySelector('header h1').textContent=REITER.find(r=>r[0]===k)[1];
-    unten.hidden=k!=='buchungen';if(k==='kosten')kostenLaden(kMonat||deIso().slice(0,7));else if(k==='lohn')lohnLaden();else zeigen()}
-  async function kostenLaden(m){kMonat=m;const nr=++kNr;app.innerHTML=reiter()+monatKopf()+'<div class="hinweis">Wird geladen …</div>';
+    unten.hidden=k!=='buchungen';if(k==='kosten')kostenLaden(kMonat||deIso().slice(0,7));else zeigen()}
+  async function kostenLaden(m){if(m!==kMonat)kAuf.clear();kMonat=m;const nr=++kNr;app.innerHTML=reiter()+monatKopf()+'<div class="hinweis">Wird geladen …</div>';
     const r=await dienst({typ:'putzkosten',monat:m}).catch(()=>null);if(nr!==kNr||ansicht!=='kosten')return;
     if(!r||!r.ok){app.innerHTML=reiter()+monatKopf()+'<div class="warn">'+dienstFehler(r)+'</div>';return}
     const d=r.daten||{preise:Object.assign({},r.vorlage||{}),extras:[]};const heute=r.heute||deIso();
-    kDaten={heute,haeuser:r.haeuser,gemacht:(r.putzen||[]).filter(p=>p.datum<=heute),geplant:(r.putzen||[]).filter(p=>p.datum>heute),gezahlt:r.gezahlt||{},
-      stand:{preise:d.preise||{},extras:(d.extras||[]).map(x=>Object.assign({},x))},vorschlag:!r.daten&&!!r.vorlage};kostenZeigen()}
-  const dienstFehler=r=>r&&r.fehler==='typ'?'Der Dienst kennt diesen Reiter noch nicht. Bitte im Skript-Editor die neue Fassung von Code.gs einfügen und eine neue Version bereitstellen.':r&&r.fehler==='passwort'?'Bitte neu anmelden.':'Keine Verbindung. Bitte nochmal versuchen.';
-  function kostenSummen(){const s=kDaten.stand,P=kDaten.gemacht;const H={};let gez=0;
-    for(const h of kDaten.haeuser){let sum=0;for(const w of h.wgs)sum+=P.filter(p=>p.haus===h.id&&p.wg===+w).length*(+s.preise[h.id+'-'+w]||0);
-      for(const x of s.extras)if(x.haus===h.id)sum+=+x.betrag||0;H[h.id]=sum;gez+=+kDaten.gezahlt[h.id]||0}
-    const gesamt=Object.values(H).reduce((a,b)=>a+b,0);return{H,gesamt,offen:gesamt-gez}}
-  const kopfText=S=>{const P=kDaten.gemacht,G=kDaten.geplant;const bis=kDaten.heute.slice(0,7)===kMonat?' bis heute ('+kurz(kDaten.heute)+')':'';
-    return P.length+' Reinigung'+(P.length===1?'':'en')+bis+(G.length?' · '+G.length+' noch geplant (nicht berechnet)':'')+(Math.abs(S.offen-S.gesamt)>.004?' · noch offen: '+eur(S.offen):'')};
-  function kostenZeigen(){const s=kDaten.stand,P=kDaten.gemacht,G=kDaten.geplant,S=kostenSummen();const u=P.filter(p=>p.unsicher).length;
+    kDaten={heute,haeuser:r.haeuser,gemacht:(r.putzen||[]).filter(p=>p.datum<=heute),geplant:(r.putzen||[]).filter(p=>p.datum>heute),
+      stand:{preise:d.preise||{},extras:(d.extras||[]).map(x=>Object.assign({},x)),status:Object.assign({},d.status||{})},vorschlag:!r.daten&&!!r.vorlage};kostenZeigen()}
+  const zaehlt=p=>kDaten.stand.status[pKey(p)]!=='aus';
+  function kostenSummen(){const s=kDaten.stand;const H={};let gesamt=0,bez=0;
+    for(const h of kDaten.haeuser){let z=0,b=0;
+      for(const p of kDaten.gemacht){if(p.haus!==h.id||!zaehlt(p))continue;const pr=+s.preise[h.id+'-'+p.wg]||0;z+=pr;if(s.status[pKey(p)]==='bezahlt')b+=pr}
+      for(const x of s.extras)if(x.haus===h.id){z+=+x.betrag||0;if(x.bezahlt)b+=+x.betrag||0}
+      H[h.id]={zahl:z,bez:b,offen:Math.round((z-b)*100)/100};gesamt+=z;bez+=b}
+    return{H,gesamt,bez,offen:Math.round((gesamt-bez)*100)/100}}
+  const kopfText=S=>{const P=kDaten.gemacht.filter(zaehlt),G=kDaten.geplant;const raus=kDaten.gemacht.length-P.length;const bis=kDaten.heute.slice(0,7)===kMonat?' bis heute ('+kurz(kDaten.heute)+')':'';
+    return P.length+' Reinigung'+(P.length===1?'':'en')+bis+(raus?' · '+raus+' zählt nicht':'')+(G.length?' · '+G.length+' noch geplant':'')};
+  const offenText=S=>'<span>bezahlt '+eur(S.bez)+'</span><span class="'+(S.offen>0?'off':'ok')+'">offen '+eur(S.offen)+'</span>';
+  const STAENDE=[['','Offen'],['bezahlt','Bezahlt'],['aus','Zählt nicht']];
+  function kostenZeigen(){const s=kDaten.stand,P=kDaten.gemacht,G=kDaten.geplant,S=kostenSummen();const u=P.filter(p=>p.unsicher&&zaehlt(p)).length;
     let h=reiter()+monatKopf()
-      +'<div class="kgesamt"><span>Zu zahlen für '+monatName(kMonat)+'</span><b id="kGes">'+eur(S.gesamt)+'</b><div class="klein" id="kOffen">'+kopfText(S)+'</div></div>'
+      +'<div class="kgesamt"><span>Zu zahlen für '+monatName(kMonat)+'</span><b id="kGes">'+eur(S.gesamt)+'</b><div class="kbez" id="kBez">'+offenText(S)+'</div><div class="klein" id="kOffen">'+kopfText(S)+'</div></div>'
       +(u?'<div class="klein" style="margin:6px 4px 0;color:#D93636">'+u+' Reinigung'+(u===1?'':'en')+' mit unbekannter Abreise (vorläufig 1 Nacht gezählt) – bitte im Reiter Buchungen ergänzen.</div>':'')
       +(kDaten.vorschlag?'<div class="klein" style="margin:6px 4px 0">Preise vom Vormonat übernommen – gespeichert wird bei der ersten Änderung.</div>':'');
-    for(const hs of kDaten.haeuser){const PH=P.filter(p=>p.haus===hs.id),GH=G.filter(p=>p.haus===hs.id);const gez=+kDaten.gezahlt[hs.id]||0;
+    for(const hs of kDaten.haeuser){const PH=P.filter(p=>p.haus===hs.id),GH=G.filter(p=>p.haus===hs.id);const offenH=PH.filter(p=>zaehlt(p)&&s.status[pKey(p)]!=='bezahlt').length;
       h+='<div class="haus">'+esc(hs.name)+'</div><div class="kkarte">';
-      for(const w of hs.wgs){const PW=PH.filter(p=>p.wg===+w);const k=hs.id+'-'+w;const uw=PW.filter(p=>p.unsicher).length;const gw=GH.filter(p=>p.wg===+w).length;
-        h+='<div class="kz2"><div class="kwg"><b>WG '+w+'</b><small>'+esc((hs.namen||{})[w]||'')+'</small></div><div class="kanz"><b>'+PW.length+'×</b>'+(uw?'<small>'+uw+' unsicher</small>':gw?'<small class="grau">+'+gw+' geplant</small>':'')+'</div>'
+      for(const w of hs.wgs){const PW=PH.filter(p=>p.wg===+w&&zaehlt(p));const k=hs.id+'-'+w;const uw=PW.filter(p=>p.unsicher).length;const gw=GH.filter(p=>p.wg===+w).length;
+        h+='<div class="kz2"><div class="kwg"><b>WG '+w+'</b><small>'+esc((hs.namen||{})[w]||'')+'</small></div><div class="kanz"><b data-anz="'+k+'">'+PW.length+'×</b>'+(uw?'<small>'+uw+' unsicher</small>':gw?'<small class="grau">+'+gw+' geplant</small>':'')+'</div>'
           +'<label class="kpreis"><input inputmode="decimal" autocomplete="off" data-preis="'+k+'" value="'+esc(zahlText(s.preise[k]))+'" placeholder="Preis" aria-label="Preis je Reinigung, '+esc(hs.name)+' WG '+w+'">€</label>'
           +'<div class="kbetrag" data-sum="'+k+'">'+eur(PW.length*(+s.preise[k]||0))+'</div></div>'}
       const ex=s.extras.filter(x=>x.haus===hs.id);
-      h+='<div class="ksum"><span>Summe'+(ex.length?' inkl. Zusätzliches':'')+'</span><b data-hsum="'+hs.id+'">'+eur(S.H[hs.id])+'</b></div>'
-        +'<div class="kgez" data-gez="'+hs.id+'">'+gezText(hs.id,S)+'</div>'
-        +(PH.length||GH.length?'<details class="kdet"><summary>Alle Reinigungen ansehen ('+PH.length+(GH.length?' + '+GH.length+' geplant':'')+')</summary>'
-          +PH.concat(GH).map(p=>'<div class="kd'+(p.datum>kDaten.heute?' geplant':'')+'"><span>'+dat(p.datum)+'</span><span>WG '+p.wg+'</span><span>'+esc(p.gast||'–')+(p.datum>kDaten.heute?' <i>geplant</i>':p.unsicher?' <em>Abreise unbekannt</em>':'')+'</span></div>').join('')+'</details>'
-          :'<div class="kleer">Keine Reinigung in diesem Monat.</div>')+'</div>'}
+      h+='<div class="ksum"><span>Summe'+(ex.length?' inkl. Zusätzliches':'')+'</span><b data-hsum="'+hs.id+'">'+eur(S.H[hs.id].zahl)+'</b></div>'
+        +'<div class="kgez" data-gez="'+hs.id+'">'+gezText(S.H[hs.id])+'</div>';
+      if(PH.length||GH.length){
+        h+='<details class="kdet" data-det="'+hs.id+'"'+(kAuf.has(hs.id)?' open':'')+'><summary>Alle Reinigungen – bezahlt / zählt nicht auswählen ('+PH.length+(GH.length?' + '+GH.length+' geplant':'')+')</summary>'
+          +(offenH>1?'<button type="button" class="knopf hell kalle" data-alle="'+hs.id+'">Alle '+offenH+' offenen als bezahlt markieren</button>':'')
+          +PH.map(p=>{const st=s.status[pKey(p)]||'';return'<div class="kd2'+(st==='aus'?' aus':'')+'"><div class="kdk"><span>'+dat(p.datum)+'</span><span>WG '+p.wg+'</span><span>'+esc(p.gast||'–')+(p.unsicher?' <em>Abreise unbekannt</em>':'')+'</span></div>'
+            +'<div class="seg" role="radiogroup" aria-label="Stand der Reinigung '+dat(p.datum)+' WG '+p.wg+'">'+STAENDE.map(([v,t])=>'<button type="button" role="radio" aria-checked="'+(st===v)+'" data-st="'+esc(pKey(p))+'" data-wert="'+v+'"'+(st===v?' class="an '+(v||'offen')+'"':'')+'>'+t+'</button>').join('')+'</div></div>'}).join('')
+          +GH.map(p=>'<div class="kd2 geplant"><div class="kdk"><span>'+dat(p.datum)+'</span><span>WG '+p.wg+'</span><span>'+esc(p.gast||'–')+' <i>geplant</i></span></div></div>').join('')+'</details>'}
+      else h+='<div class="kleer">Keine Reinigung in diesem Monat.</div>';
+      h+='</div>'}
     h+='<div class="abschnitt">Zusätzliches</div><div class="kkarte">'
       +(s.extras.length?'':'<div class="kleer">Z. B. Waschmittel, Fahrtkosten, Sonderreinigung. Ein Abzug mit Minus (−20).</div>')
       +s.extras.map((x,i)=>'<div class="kx"><input class="ktext" data-x="text" data-i="'+i+'" value="'+esc(x.text)+'" placeholder="Was? (z. B. Waschmittel)" aria-label="Beschreibung"><select data-x="haus" data-i="'+i+'" aria-label="Für welches Haus">'
         +kDaten.haeuser.map(hs=>'<option value="'+hs.id+'"'+(x.haus===hs.id?' selected':'')+'>'+esc(hs.name)+'</option>').join('')+'</select>'
         +'<label class="kpreis"><input inputmode="decimal" autocomplete="off" data-x="betrag" data-i="'+i+'" value="'+esc(zahlText(x.betrag))+'" placeholder="0,00" aria-label="Betrag">€</label>'
-        +'<button type="button" class="kweg" data-weg="'+i+'" aria-label="Posten entfernen">×</button></div>').join('')
+        +'<button type="button" class="kweg" data-weg="'+i+'" aria-label="Posten entfernen">×</button>'
+        +'<label class="kxbez"><input type="checkbox" data-x="bezahlt" data-i="'+i+'"'+(x.bezahlt?' checked':'')+'>bezahlt</label></div>').join('')
       +'<button type="button" class="knopf hell kplus" data-k="plus">+ Posten hinzufügen</button></div>'
       +'<div class="meldung" id="kMeld" style="margin-top:10px"></div>';
     app.innerHTML=h}
-  function gezText(hk,S){const gez=+kDaten.gezahlt[hk]||0;const off=Math.round((S.H[hk]-gez)*100)/100;
-    return '<span>Gezahlt (Reiter Lohn)</span><b>'+eur(gez)+'</b><span>'+(off>0?'Offen':off<0?'Zu viel gezahlt':'Offen')+'</span><b class="'+(off>0?'off':'ok')+'">'+(off===0&&gez?'✓ ':'')+eur(Math.abs(off))+'</b>'}
+  const gezText=x=>'<span>Bezahlt</span><b>'+eur(x.bez)+'</b><span>Offen</span><b class="'+(x.offen>0?'off':'ok')+'">'+(x.offen===0&&x.zahl?'✓ ':'')+eur(x.offen)+'</b>';
   /* Zahlen sofort mitrechnen, ohne neu zu zeichnen (sonst springt beim Tippen der Fokus weg) */
-  function kostenRechnen(){const s=kDaten.stand,P=kDaten.gemacht,S=kostenSummen();
-    app.querySelectorAll('[data-sum]').forEach(el=>{const k=el.dataset.sum;const i=k.lastIndexOf('-');el.textContent=eur(P.filter(p=>p.haus===k.slice(0,i)&&p.wg===+k.slice(i+1)).length*(+s.preise[k]||0))});
-    app.querySelectorAll('[data-hsum]').forEach(el=>{el.textContent=eur(S.H[el.dataset.hsum])});
-    app.querySelectorAll('[data-gez]').forEach(el=>{el.innerHTML=gezText(el.dataset.gez,S)});
+  function kostenRechnen(){const s=kDaten.stand,S=kostenSummen();
+    app.querySelectorAll('[data-sum]').forEach(el=>{const k=el.dataset.sum;const i=k.lastIndexOf('-');el.textContent=eur(kDaten.gemacht.filter(p=>p.haus===k.slice(0,i)&&p.wg===+k.slice(i+1)&&zaehlt(p)).length*(+s.preise[k]||0))});
+    app.querySelectorAll('[data-hsum]').forEach(el=>{el.textContent=eur(S.H[el.dataset.hsum].zahl)});
+    app.querySelectorAll('[data-gez]').forEach(el=>{el.innerHTML=gezText(S.H[el.dataset.gez])});
     const g=document.getElementById('kGes');if(g)g.textContent=eur(S.gesamt);
+    const b=document.getElementById('kBez');if(b)b.innerHTML=offenText(S);
     const o=document.getElementById('kOffen');if(o)o.textContent=kopfText(S)}
   function kostenSpeichern(){const m=kMonat,d=JSON.parse(JSON.stringify(kDaten.stand));kDaten.vorschlag=false;
     const zeige=(t,rot)=>{const el=document.getElementById('kMeld');if(el&&kMonat===m&&ansicht==='kosten'){el.style.color=rot?'#D93636':'';el.textContent=t}};zeige('Wird gespeichert …');
@@ -272,68 +291,23 @@ main{padding-bottom:120px}
     kKette=kKette.then(async()=>{const r=await dienst({typ:'putzkostenSpeichern',monat:m,daten:d}).catch(()=>null);
       if(r&&r.ok)zeige('Gespeichert ✓');else zeige('Speichern ging nicht'+(r&&r.fehler==='typ'?' – bitte die neue Version des Dienstes bereitstellen':'')+'. Bitte nochmal ändern.',true)})}
   function kostenKlick(e){const r=e.target.closest('[data-reiter]');if(r){reiterWechsel(r.dataset.reiter);return true}
-    if(ansicht==='lohn')return lohnKlick(e);
-    if(ansicht!=='kosten')return false;
-    const k=e.target.closest('[data-k]');if(k){if(k.dataset.k==='plus'){kDaten.stand.extras.push({text:'',haus:kDaten.haeuser[0].id,betrag:null});kostenZeigen();const t=app.querySelectorAll('.kx .ktext');if(t.length)t[t.length-1].focus()}
+    if(ansicht!=='kosten')return false;if(!kDaten)return true;const s=kDaten.stand;
+    const st=e.target.closest('[data-st]');if(st){const v=st.dataset.wert;if(v)s.status[st.dataset.st]=v;else delete s.status[st.dataset.st];kostenZeigen();kostenSpeichern();return true}
+    const al=e.target.closest('[data-alle]');if(al){for(const p of kDaten.gemacht)if(p.haus===al.dataset.alle&&zaehlt(p))s.status[pKey(p)]='bezahlt';kostenZeigen();kostenSpeichern();return true}
+    const k=e.target.closest('[data-k]');if(k){if(k.dataset.k==='plus'){s.extras.push({text:'',haus:kDaten.haeuser[0].id,betrag:null});kostenZeigen();const t=app.querySelectorAll('.kx .ktext');if(t.length)t[t.length-1].focus()}
       else kostenLaden(monatPlus(kMonat,k.dataset.k==='vor'?1:-1));return true}
-    const w=e.target.closest('[data-weg]');if(w){const x=kDaten.stand.extras[+w.dataset.weg];if((x.text||x.betrag)&&!confirm('Posten „'+(x.text||eur(x.betrag))+'“ entfernen?'))return true;
-      kDaten.stand.extras.splice(+w.dataset.weg,1);kostenZeigen();kostenSpeichern();return true}
+    const w=e.target.closest('[data-weg]');if(w){const x=s.extras[+w.dataset.weg];if((x.text||x.betrag)&&!confirm('Posten „'+(x.text||eur(x.betrag))+'“ entfernen?'))return true;
+      s.extras.splice(+w.dataset.weg,1);kostenZeigen();kostenSpeichern();return true}
     return true}
   function kostenFeld(e,speichern){if(ansicht!=='kosten'||!kDaten)return;const t=e.target,s=kDaten.stand;
     if(t.dataset.preis){const n=zahl(t.value);if(n==null||n<0)delete s.preise[t.dataset.preis];else s.preise[t.dataset.preis]=n}
-    else if(t.dataset.x){const x=s.extras[+t.dataset.i];if(!x)return;x[t.dataset.x]=t.dataset.x==='betrag'?zahl(t.value):t.value}
+    else if(t.dataset.x){const x=s.extras[+t.dataset.i];if(!x)return;if(t.dataset.x==='bezahlt'){if(!speichern)return;x.bezahlt=t.checked}else x[t.dataset.x]=t.dataset.x==='betrag'?zahl(t.value):t.value}
     else return;
     kostenRechnen();if(speichern){if(t.dataset.preis&&zahl(t.value)!=null)t.value=zahlText(s.preise[t.dataset.preis]);kostenSpeichern()}}
   app.addEventListener('input',e=>kostenFeld(e,false));
   app.addEventListener('change',e=>kostenFeld(e,true));
-
-  /* ---------- Reiter „Lohn“: was tatsächlich an die Putzkräfte gezahlt wurde ----------
-     Jede Zahlung: Datum, Haus (= Putzkraft), für welchen Monat, Betrag, Notiz (bar/Überweisung …). Gespeichert im Blatt „Lohn“.
-     Je Monat und Haus: zu zahlen (aus Putzkosten, nur gemachte Reinigungen) − gezahlt = offen. */
-  let lDaten=null,lNr=0;
-  async function lohnLaden(neu){const nr=++lNr;if(!neu)app.innerHTML=reiter()+'<div class="hinweis">Wird geladen …</div>';
-    const r=neu||await dienst({typ:'lohn'}).catch(()=>null);if(nr!==lNr||ansicht!=='lohn')return;
-    if(!r||!r.ok){app.innerHTML=reiter()+'<div class="warn">'+dienstFehler(r)+'</div>';return}lDaten=r;lohnZeigen()}
-  const lohnOffen=(m,hk)=>{const mo=lDaten.monate.find(x=>x.monat===m);const soll=mo?+mo.soll[hk]||0:0;
-    const gez=lDaten.zahlungen.filter(z=>z.monat===m&&z.haus===hk).reduce((a,z)=>a+z.betrag,0);return{soll,gez,offen:Math.round((soll-gez)*100)/100}};
-  const hausName=hk=>(lDaten.haeuser.find(h=>h.id===hk)||{}).name||hk;
-  function lohnZeigen(){const H=lDaten.haeuser;let gesOffen=0,gesGez=0;
-    for(const mo of lDaten.monate)for(const hs of H){const o=lohnOffen(mo.monat,hs.id);gesOffen+=o.offen;gesGez+=o.gez}
-    let h=reiter()+'<div class="kgesamt"><span>Noch offen insgesamt</span><b>'+eur(gesOffen)+'</b><div class="klein">Gezahlt bisher: '+eur(gesGez)+' · laufender Monat nur bis heute ('+kurz(lDaten.heute)+')</div></div>'
-      +'<button type="button" class="knopf kplus" data-l="neu" style="margin:10px 0 4px">+ Zahlung eintragen</button>';
-    for(const mo of lDaten.monate){const Z=lDaten.zahlungen.filter(z=>z.monat===mo.monat);
-      h+='<div class="haus">'+monatName(mo.monat)+'</div><div class="kkarte">'
-        +H.map(hs=>{const o=lohnOffen(mo.monat,hs.id);return'<div class="lz"><b>'+esc(hs.name)+'</b><div class="lzahlen"><span>zu zahlen</span><b>'+eur(o.soll)+'</b><span>gezahlt</span><b>'+eur(o.gez)+'</b><span>'+(o.offen<0?'zu viel':'offen')+'</span><b class="'+(o.offen>0?'off':'ok')+'">'+(o.offen===0&&o.soll?'✓ ':'')+eur(Math.abs(o.offen))+'</b></div></div>'}).join('')
-        +(Z.length?Z.map(z=>'<div class="lzeile"><div><b>'+eur(z.betrag)+'</b><div class="klein">'+kurz(z.datum)+z.datum.slice(2,4)+' · '+esc(hausName(z.haus))+(z.notiz?' · '+esc(z.notiz):'')+'</div></div><button type="button" class="kweg" data-lweg="'+esc(z.id)+'" aria-label="Zahlung löschen">×</button></div>').join('')
-          :'<div class="kleer">Noch keine Zahlung für diesen Monat.</div>')+'</div>'}
-    h+='<div class="meldung" id="lMeld" style="margin-top:10px"></div>';app.innerHTML=h}
-  function lohnFormular(){const H=lDaten.haeuser;const heute=lDaten.heute;
-    /* Vorschlag: am Monatsanfang zahlt man meist den Vormonat */
-    const mVor=+heute.slice(8)<=15?monatPlus(heute.slice(0,7),-1):heute.slice(0,7);
-    const monate=[...new Set([heute.slice(0,7),...lDaten.monate.map(m=>m.monat)])].sort().reverse();
-    bf.innerHTML='<div class="bkopf"><div class="bkt"><h2>Zahlung eintragen</h2><div class="unter">Lohn an die Putzkraft</div></div></div>'
-      +'<div class="raster"><label class="feld">Datum<input type="date" name="datum" value="'+heute+'" required></label>'
-      +'<label class="feld">Für Monat<select name="monat">'+monate.map(m=>'<option value="'+m+'"'+(m===mVor?' selected':'')+'>'+monatName(m)+'</option>').join('')+'</select></label>'
-      +'<label class="feld breit">Haus / Putzkraft<select name="haus">'+H.map(hs=>'<option value="'+hs.id+'">'+esc(hs.name)+'</option>').join('')+'</select></label>'
-      +'<label class="feld">Betrag (€)<input name="betrag" inputmode="decimal" autocomplete="off" required placeholder="0,00"></label>'
-      +'<label class="feld">Notiz<input name="notiz" maxlength="120" placeholder="bar, Überweisung …"></label></div>'
-      +'<div class="klein" id="lHinweis"></div>'
-      +'<div class="knoepfe"><button class="knopf hell" type="button" id="lZu">Abbrechen</button><button class="knopf" value="ok" id="lOk">Speichern</button></div>';
-    const f=bf.elements,hin=bf.querySelector('#lHinweis');let getippt=false;
-    /* Betrag mit dem offenen Rest vorbelegen, solange nichts getippt ist */
-    const vorbelegen=()=>{const o=lohnOffen(f.monat.value,f.haus.value);hin.textContent='Offen für '+hausName(f.haus.value)+', '+monatName(f.monat.value)+': '+eur(o.offen);if(!getippt)f.betrag.value=o.offen>0?zahlText(o.offen):''};
-    f.monat.onchange=vorbelegen;f.haus.onchange=vorbelegen;f.betrag.oninput=()=>{getippt=true};vorbelegen();
-    bf.querySelector('#lZu').onclick=()=>blatt.close();
-    bf.onsubmit=async e=>{e.preventDefault();const n=zahl(f.betrag.value);if(n==null||n===0){alert('Bitte einen Betrag eintragen.');return}
-      const ok=bf.querySelector('#lOk');ok.disabled=true;ok.textContent='Wird gespeichert …';
-      const r=await dienst({typ:'lohnSpeichern',zahlung:{datum:f.datum.value,monat:f.monat.value,haus:f.haus.value,betrag:n,notiz:f.notiz.value}}).catch(()=>null);
-      if(r&&r.ok){blatt.close();lohnLaden(r);const m=document.getElementById('lMeld');if(m)m.textContent='Zahlung gespeichert ✓'}
-      else{ok.disabled=false;ok.textContent='Speichern';alert(r&&r.fehler==='eingabe'?'Bitte Datum, Monat, Haus und Betrag prüfen.':dienstFehler(r))}};
-    blatt.showModal()}
-  function lohnKlick(e){if(!lDaten)return true;if(e.target.closest('[data-l="neu"]')){lohnFormular();return true}
-    const w=e.target.closest('[data-lweg]');if(w){const z=lDaten.zahlungen.find(x=>x.id===w.dataset.lweg);if(!z||!confirm('Zahlung über '+eur(z.betrag)+' vom '+kurz(z.datum)+' löschen?'))return true;
-      w.disabled=true;dienst({typ:'lohnLoeschen',id:z.id}).catch(()=>null).then(r=>{if(r&&r.ok)lohnLaden(r);else{w.disabled=false;alert(dienstFehler(r))}})}
-    return true}
+  /* Aufgeklappte Listen bleiben beim Neuzeichnen offen */
+  app.addEventListener('toggle',e=>{const d=e.target;if(d.dataset&&d.dataset.det){if(d.open)kAuf.add(d.dataset.det);else kAuf.delete(d.dataset.det)}},true);
 
   /* ---------- Blatt: Buchung ändern oder Tag blockieren ---------- */
   const zeitOpt=(L,v)=>'<option value=>nein</option>'+L.concat(v&&!L.includes(v)?[v]:[]).map(t=>'<option'+(t===v?' selected':'')+'>'+t+'</option>').join('');
