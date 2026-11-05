@@ -80,7 +80,7 @@ function leseBookingNachricht(m){const t=String(m.text||'').replace(/\r/g,'');co
     unterkunft:(/hotel_id=(\d+)/.exec(flach)||[])[1]||feld('Unterkunftsname')}}
 
 /* ---------- Verwaltungstabelle ---------- */
-const KOEPFE={Abos:['endpoint','haus','seit'],Muell:['haus','datum','art']};
+const KOEPFE={Abos:['endpoint','haus','seit'],Muell:['haus','datum','art'],Putzkosten:['monat','daten','geaendert']};
 function blatt(name){const ss=SpreadsheetApp.openById(VERWALTUNG_ID);let sh=ss.getSheetByName(name);
   if(!sh){sh=ss.insertSheet(name);if(KOEPFE[name])sh.getRange(1,1,1,KOEPFE[name].length).setValues([KOEPFE[name]])}return sh}
 function buchungenLesen(){const sh=blatt('Buchungen');const v=sh.getDataRange().getDisplayValues();const L=[];
@@ -162,6 +162,34 @@ function oeffentlichSchreiben(L){L=fuerPutzplan(L);const heute=heuteIso();const 
       P.setProperty('hash_'+hk,hash)}
     ss.getSheetByName('Daten').getRange('D1').setValue(S.stand+jetzt+S.rot)}}
 
+/* ---------- Putzkosten (nur Admin): Reinigungen je Wohnung und Monat, Preise, Zusatzposten ---------- */
+/* Eine Reinigung = eine Abreise (wie im Putzplan der Putzkräfte). Mehrere Abreisen derselben Wohnung am selben Tag
+   zählen einmal. Unbekannte Abreise: wie im Putzplan vorläufig eine Nacht, aber als „unsicher“ markiert. */
+function putzenImMonat(monat,L){const s=new Set();const P=[];
+  for(const b of fuerPutzplan(L||buchungenLesen())){if(b.status==='storniert'||!HAEUSER[b.haus]||!b.wg||!b.abreise||b.abreise.slice(0,7)!==monat)continue;
+    const k=b.haus+'|'+b.wg+'|'+b.abreise;if(s.has(k))continue;s.add(k);
+    P.push({haus:b.haus,wg:+b.wg,datum:b.abreise,gast:b.gast||'',quelle:b.quelle||'',unsicher:!!b.unsicher})}
+  return P.sort((a,b)=>a.datum.localeCompare(b.datum)||a.haus.localeCompare(b.haus)||a.wg-b.wg)}
+function kostenLesen(){const v=blatt('Putzkosten').getDataRange().getDisplayValues();const K={};
+  for(let i=1;i<v.length;i++){if(!v[i][0])continue;try{K[v[i][0]]=JSON.parse(v[i][1])}catch(e){}}return K}
+/* Nur saubere Werte speichern: bekannte Wohnungen, Beträge als Zahl, Zusatzposten immer einem Haus zugeordnet */
+function kostenPruefen(d){d=d||{};const preise={};const ersteHaus=Object.keys(HAEUSER)[0];
+  for(const k in (d.preise||{})){const m=/^([a-z]+)-(\d+)$/.exec(k);if(!m||!HAEUSER[m[1]]||HAEUSER[m[1]].wgs.indexOf(+m[2])<0)continue;
+    const n=Number(d.preise[k]);if(isFinite(n)&&n>=0&&n<=1000)preise[k]=Math.round(n*100)/100}
+  const extras=(Array.isArray(d.extras)?d.extras:[]).slice(0,60).map(x=>{x=x||{};const n=Number(x.betrag);
+    return{text:String(x.text||'').replace(/[\r\n]+/g,' ').trim().slice(0,120),haus:HAEUSER[x.haus]?x.haus:ersteHaus,betrag:isFinite(n)?Math.max(-100000,Math.min(100000,Math.round(n*100)/100)):0}})
+    .filter(x=>x.text||x.betrag);
+  const bezahlt={};for(const k in HAEUSER)if(d.bezahlt&&d.bezahlt[k])bezahlt[k]=true;
+  return{preise:preise,extras:extras,bezahlt:bezahlt}}
+function kostenSchreiben(monat,d){const sh=blatt('Putzkosten');const v=sh.getDataRange().getDisplayValues();
+  let r=-1;for(let i=1;i<v.length;i++)if(v[i][0]===monat){r=i+1;break}if(r<0)r=Math.max(sh.getLastRow(),1)+1;
+  sh.getRange(r,1,1,3).setNumberFormat('@').setValues([[monat,JSON.stringify(d),new Date().toISOString()]])}
+function putzkosten(monat){const K=kostenLesen();
+  /* Noch nichts eingetragen: die Preise des letzten Monats mit Preisen als Vorschlag (gespeichert wird erst bei einer Änderung) */
+  const frueher=Object.keys(K).filter(k=>k<monat&&K[k]&&K[k].preise&&Object.keys(K[k].preise).length).sort().pop();
+  return{ok:true,monat:monat,heute:heuteIso(),haeuser:Object.keys(HAEUSER).map(k=>({id:k,name:HAEUSER[k].name,wgs:HAEUSER[k].wgs,namen:HAEUSER[k].namen})),
+    putzen:putzenImMonat(monat),daten:K[monat]||null,vorlage:frueher?K[frueher].preise:null}}
+
 /* ---------- Was ist an einem Tag zu tun (Push-Meldung) ---------- */
 function aufgaben(hk,d,L){const S=T[HAEUSER[hk].sprache];const M=muellLesen()[hk]||[];
   const aktiv=fuerPutzplan(L||buchungenLesen()).filter(b=>b.haus===hk&&b.status!=='storniert');
@@ -216,6 +244,10 @@ function doPost(e){let x={};try{x=JSON.parse(e.postData.contents)}catch(err){ret
   if(x.typ==='abmelden'){const sh=blatt('Abos');const v=sh.getDataRange().getValues();for(let i=v.length-1;i>=1;i--)if(v[i][0]===x.endpoint)sh.deleteRow(i+1);return json({ok:true})}
   if(!adminOk(x))return json({fehler:'passwort'});
   if(x.typ==='login')return json({ok:true});
+  const MONAT=/^\d{4}-(0[1-9]|1[0-2])$/;
+  if(x.typ==='putzkosten'){if(!MONAT.test(String(x.monat||'')))return json({fehler:'monat'});return json(putzkosten(x.monat))}
+  if(x.typ==='putzkostenSpeichern'){if(!MONAT.test(String(x.monat||'')))return json({fehler:'monat'});
+    const lock=LockService.getScriptLock();lock.waitLock(20000);try{const d=kostenPruefen(x.daten);kostenSchreiben(x.monat,d);return json({ok:true,daten:d})}finally{lock.releaseLock()}}
   if(x.typ==='liste'){const ab=plus(heuteIso(),-14);return json({ok:true,heute:heuteIso(),haeuser:Object.keys(HAEUSER).map(k=>({id:k,name:HAEUSER[k].name,wgs:HAEUSER[k].wgs,namen:HAEUSER[k].namen})),
     buchungen:ergaenzen(buchungenLesen()).filter(b=>b.status!=='storniert'&&(b.abreise||b.anreise)>=ab)})}
   /* Veröffentlichen: alle Änderungen der Admin-Seite auf einmal – danach EINMAL die Tabellen neu schreiben.
