@@ -259,7 +259,7 @@ main{padding-bottom:120px}
       h+='<div class="ksum"><span>Summe'+(ex.length?' inkl. Zusätzliches':'')+'</span><b data-hsum="'+hs.id+'">'+eur(S.H[hs.id].zahl)+'</b></div>'
         +'<div class="kgez" data-gez="'+hs.id+'">'+gezText(S.H[hs.id])+'</div>';
       if(PH.length||GH.length){
-        h+='<details class="kdet" data-det="'+hs.id+'"'+(kAuf.has(hs.id)?' open':'')+'><summary>Alle Reinigungen – bezahlt / zählt nicht auswählen ('+PH.length+(GH.length?' + '+GH.length+' geplant':'')+')</summary>'
+        h+='<details class="kdet" data-det="'+hs.id+'"'+(kAuf.has(hs.id)?' open':'')+'><summary>Alle Reinigungen ansehen ('+PH.length+(GH.length?' + '+GH.length+' geplant':'')+')</summary><div class="klein" style="margin:0 0 8px">Bei jeder gemachten Reinigung: Offen · Bezahlt · Zählt nicht.</div>'
           +(offenH>1?'<button type="button" class="knopf hell kalle" data-alle="'+hs.id+'">Alle '+offenH+' offenen als bezahlt markieren</button>':'')
           +PH.map(p=>{const st=s.status[pKey(p)]||'';return'<div class="kd2'+(st==='aus'?' aus':'')+'"><div class="kdk"><span>'+dat(p.datum)+'</span><span>WG '+p.wg+'</span><span>'+esc(p.gast||'–')+(p.unsicher?' <em>Abreise unbekannt</em>':'')+'</span></div>'
             +'<div class="seg" role="radiogroup" aria-label="Stand der Reinigung '+dat(p.datum)+' WG '+p.wg+'">'+STAENDE.map(([v,t])=>'<button type="button" role="radio" aria-checked="'+(st===v)+'" data-st="'+esc(pKey(p))+'" data-wert="'+v+'"'+(st===v?' class="an '+(v||'offen')+'"':'')+'>'+t+'</button>').join('')+'</div></div>'}).join('')
