@@ -250,6 +250,10 @@ function doPost(e){let x={};try{x=JSON.parse(e.postData.contents)}catch(err){ret
   if(x.typ==='putzkosten'){if(!MONAT.test(String(x.monat||'')))return json({fehler:'monat'});return json(putzkosten(x.monat))}
   if(x.typ==='putzkostenSpeichern'){if(!MONAT.test(String(x.monat||'')))return json({fehler:'monat'});
     const lock=LockService.getScriptLock();lock.waitLock(20000);try{const d=kostenPruefen(x.daten);kostenSchreiben(x.monat,d);return json({ok:true,daten:d})}finally{lock.releaseLock()}}
+  if(x.typ==='liste'){const ab=plus(heuteIso(),-14);return json({ok:true,heute:heuteIso(),haeuser:Object.keys(HAEUSER).map(k=>({id:k,name:HAEUSER[k].name,wgs:HAEUSER[k].wgs,namen:HAEUSER[k].namen})),
+    buchungen:ergaenzen(buchungenLesen()).filter(b=>b.status!=='storniert'&&(b.abreise||b.anreise)>=ab)})}
+  /* Veröffentlichen: alle Änderungen der Admin-Seite auf einmal – danach EINMAL die Tabellen neu schreiben.
+     Jede Änderung: {id, felder}; eine neue Buchung kommt mit id 'neu…'. */
   if(x.typ==='veroeffentlichen'){const lock=LockService.getScriptLock();lock.waitLock(20000);
     try{const L=buchungenLesen();const fertig=[];const jetzt=new Date().toISOString();
       for(const a of x.aenderungen||[]){let b=/^neu/.test(a.id||'')?null:L.find(o=>o.id===a.id);
