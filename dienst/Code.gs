@@ -80,7 +80,7 @@ function leseBookingNachricht(m){const t=String(m.text||'').replace(/\r/g,'');co
     unterkunft:(/hotel_id=(\d+)/.exec(flach)||[])[1]||feld('Unterkunftsname')}}
 
 /* ---------- Verwaltungstabelle ---------- */
-const KOEPFE={Abos:['endpoint','haus','seit'],Muell:['haus','datum','art'],Putzkosten:['monat','daten','geaendert']};
+const KOEPFE={Abos:['endpoint','haus','seit'],Muell:['haus','datum','art'],Putzkosten:['monat','daten','geaendert'],Events:['id','von','bis','titel','ort','art','zuschlag','quelle','status','notiz','link','vorlaeufig','geaendert']};
 function blatt(name){const ss=SpreadsheetApp.openById(VERWALTUNG_ID);let sh=ss.getSheetByName(name);
   if(!sh){sh=ss.insertSheet(name);if(KOEPFE[name])sh.getRange(1,1,1,KOEPFE[name].length).setValues([KOEPFE[name]])}return sh}
 function buchungenLesen(){const sh=blatt('Buchungen');const v=sh.getDataRange().getDisplayValues();const L=[];
@@ -192,6 +192,57 @@ const haeuserListe=()=>Object.keys(HAEUSER).map(k=>({id:k,name:HAEUSER[k].name,w
 function putzkosten(monat){const K=kostenLesen();
   return{ok:true,monat:monat,heute:heuteIso(),haeuser:haeuserListe(),putzen:putzenImMonat(monat),daten:K[monat]||null,vorlage:vorlageFuer(K,monat)}}
 
+/* ---------- Events & Preise (nur Admin): Veranstaltungen in und um Mönchengladbach mit Preis-Vorschlag ----------
+   Heimspiele von Borussia Mönchengladbach kommen KOSTENLOS und automatisch aus OpenLigaDB (kein Schlüssel, keine KI):
+   am 1. jedes Monats per Zeitauslöser und auf Knopfdruck im Admin. Alles andere (Konzerte, Messen, Karneval …) steht
+   als Zeile im Blatt „Events“ – recherchiert oder im Admin selbst eingetragen. Der Zuschlag ist ein VORSCHLAG aus
+   Erfahrungswerten, nicht gemessen. Grundpreise je Wohnung (für den Euro-Vorschlag) stehen in den Skript-Eigenschaften. */
+const GLADBACH_ID=87;
+const EV_SPALTEN=['id','von','bis','titel','ort','art','zuschlag','quelle','status','notiz','link','vorlaeufig','geaendert'];
+const EV_ARTEN=['fussball','konzert','messe','fest','sonstiges'];
+/* Vorschlag je Gegner: Topspiele ziehen mehr Auswärtsfans */
+const TOP_GEGNER=/bayern|dortmund|köln|koeln|schalke|leverkusen|düsseldorf|duesseldorf|hamburger|frankfurt/i;
+function eventsLesen(){const v=blatt('Events').getDataRange().getDisplayValues();const E=[];
+  for(let i=1;i<v.length;i++){if(!v[i][0])continue;const e={};EV_SPALTEN.forEach((k,j)=>e[k]=v[i][j]||'');e.zuschlag=Number(e.zuschlag)||0;e.vorlaeufig=e.vorlaeufig==='1';E.push(e)}return E}
+function eventsSchreiben(E){const sh=blatt('Events');E.sort((a,b)=>a.von.localeCompare(b.von)||a.id.localeCompare(b.id));
+  const w=[EV_SPALTEN,...E.map(e=>EV_SPALTEN.map(k=>k==='vorlaeufig'?(e[k]?'1':''):e[k]==null?'':String(e[k])))];
+  sh.clearContents();sh.getRange(1,1,w.length,EV_SPALTEN.length).setNumberFormat('@').setValues(w)}
+const saisonVon=d=>{const y=+d.slice(0,4),m=+d.slice(5,7);return m>=7?y:y-1};
+/* Spielplan holen: aktuelle Saison, ab Mai auch die nächste. Bundesliga, 2. Liga (falls Abstieg), DFB-Pokal. */
+function spielplanHolen(heute){const s0=saisonVon(heute);const saisons=[s0];if(+heute.slice(5,7)>=5&&+heute.slice(5,7)<7)saisons.push(s0+1);
+  const S=[];for(const saison of saisons)for(const liga of ['bl1','bl2','dfb']){let M=[];
+    try{const r=UrlFetchApp.fetch('https://api.openligadb.de/getmatchdata/'+liga+'/'+saison,{muteHttpExceptions:true});if(r.getResponseCode()===200)M=JSON.parse(r.getContentText())}catch(e){console.error(liga,saison,e)}
+    for(const m of M){if(!m.team1||m.team1.teamId!==GLADBACH_ID)continue;S.push({liga:liga,m:m})}}
+  return S}
+function spielZuEvent(x,heute){const m=x.m;const d=String(m.matchDateTime||'').slice(0,10);const zeit=String(m.matchDateTime||'').slice(11,16);
+  const gegner=(m.team2&&m.team2.teamName)||'?';const pokal=x.liga==='dfb';const top=TOP_GEGNER.test(gegner);
+  /* Bundesliga-Termine stehen erst ~6 Wochen vorher fest (Fr–So möglich) – bis dahin „vorläufig“ */
+  const vorl=!pokal&&naechte(heute,d)>42;
+  return{id:'ol-'+m.matchID,von:d,bis:d,titel:(pokal?'DFB-Pokal: ':'Heimspiel: ')+'Borussia – '+gegner,ort:'Borussia-Park',art:'fussball',
+    zuschlag:pokal?15:top?35:20,quelle:'auto',status:'',notiz:(m.group&&m.group.groupName||'')+(zeit&&zeit!=='00:00'?' · Anstoß '+zeit:''),link:'',vorlaeufig:vorl}}
+/* Bestehende Auto-Zeilen: Datum, Titel und „vorläufig“ werden aktualisiert – Zuschlag, Status und Notiz-Änderungen
+   des Betreibers bleiben (er kann einen Vorschlag anpassen oder ein Spiel ausblenden). */
+function eventsAktualisieren(){const heute=heuteIso();const lock=LockService.getScriptLock();lock.waitLock(20000);
+  try{const E=eventsLesen();const S=spielplanHolen(heute);let neu=0;
+    for(const x of S){const e=spielZuEvent(x,heute);if(!e.von||e.von<plus(heute,-31))continue;const alt=E.find(o=>o.id===e.id);
+      if(alt){alt.von=e.von;alt.bis=e.bis;alt.titel=e.titel;alt.vorlaeufig=e.vorlaeufig;if(alt.quelle==='auto'&&!alt.geaendert)alt.notiz=e.notiz}
+      else{E.push(e);neu++}}
+    eventsSchreiben(E);PropertiesService.getScriptProperties().setProperty('events_stand',new Date().toISOString());return{spiele:S.length,neu:neu}}
+  finally{lock.releaseLock()}}
+function eventsMonatlich(){eventsAktualisieren()}
+/* Zeitauslöser am 1. jedes Monats – legt sich selbst an, sobald der Admin den Reiter öffnet */
+function eventsAusloeser(){if(!ScriptApp.getProjectTriggers().some(t=>t.getHandlerFunction()==='eventsMonatlich'))
+  ScriptApp.newTrigger('eventsMonatlich').timeBased().onMonthDay(1).atHour(6).inTimezone('Europe/Berlin').create()}
+function eventsAntwort(extra){const P=PropertiesService.getScriptProperties();let gp={};try{gp=JSON.parse(P.getProperty('grundpreise')||'{}')}catch(e){}
+  return Object.assign({ok:true,heute:heuteIso(),haeuser:haeuserListe(),events:eventsLesen(),grundpreise:gp,stand:P.getProperty('events_stand')||''},extra||{})}
+function eventPruefen(e){e=e||{};const d=/^\d{4}-\d{2}-\d{2}$/;if(!d.test(String(e.von||''))||!String(e.titel||'').trim())return null;
+  const bis=d.test(String(e.bis||''))&&e.bis>=e.von?e.bis:e.von;const z=Number(e.zuschlag);
+  return{id:/^(ol|ev|re)-[0-9a-z-]{3,40}$/.test(String(e.id||''))?e.id:'ev-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+    von:e.von,bis:bis,titel:String(e.titel).replace(/[\r\n]+/g,' ').trim().slice(0,120),ort:String(e.ort||'').replace(/[\r\n]+/g,' ').trim().slice(0,80),
+    art:EV_ARTEN.indexOf(e.art)>=0?e.art:'sonstiges',zuschlag:isFinite(z)?Math.max(-50,Math.min(300,Math.round(z))):0,
+    status:e.status==='aus'?'aus':'',notiz:String(e.notiz||'').replace(/[\r\n]+/g,' ').trim().slice(0,200),
+    link:/^https:\/\/[^\s"<>]{3,300}$/.test(String(e.link||''))?e.link:''}}
+
 /* ---------- Was ist an einem Tag zu tun (Push-Meldung) ---------- */
 function aufgaben(hk,d,L){const S=T[HAEUSER[hk].sprache];const M=muellLesen()[hk]||[];
   const aktiv=fuerPutzplan(L||buchungenLesen()).filter(b=>b.haus===hk&&b.status!=='storniert');
@@ -250,6 +301,26 @@ function doPost(e){let x={};try{x=JSON.parse(e.postData.contents)}catch(err){ret
   if(x.typ==='putzkosten'){if(!MONAT.test(String(x.monat||'')))return json({fehler:'monat'});return json(putzkosten(x.monat))}
   if(x.typ==='putzkostenSpeichern'){if(!MONAT.test(String(x.monat||'')))return json({fehler:'monat'});
     const lock=LockService.getScriptLock();lock.waitLock(20000);try{const d=kostenPruefen(x.daten);kostenSchreiben(x.monat,d);return json({ok:true,daten:d})}finally{lock.releaseLock()}}
+  if(x.typ==='events'){try{eventsAusloeser()}catch(e){console.error(e)}
+    const st=PropertiesService.getScriptProperties().getProperty('events_stand');
+    /* noch nie oder vor über 31 Tagen geholt: jetzt holen (z. B. falls der Monatsauslöser einmal ausfiel) */
+    if(!st||Date.now()-Date.parse(st)>31*864e5){try{eventsAktualisieren()}catch(e){console.error(e)}}
+    return json(eventsAntwort())}
+  if(x.typ==='eventsAktualisieren'){const r=eventsAktualisieren();return json(eventsAntwort({ergebnis:r}))}
+  if(x.typ==='eventSpeichern'||x.typ==='eventLoeschen'){const lock=LockService.getScriptLock();lock.waitLock(20000);
+    try{const E=eventsLesen();
+      if(x.typ==='eventLoeschen'){const i=E.findIndex(e=>e.id===String(x.id||''));if(i<0)return json({fehler:'eingabe'});
+        /* Spiele aus dem Spielplan nur ausblenden – sonst kämen sie beim nächsten Abruf wieder */
+        if(E[i].quelle==='auto')E[i].status='aus';else E.splice(i,1)}
+      else{const e=eventPruefen(x.event);if(!e)return json({fehler:'eingabe'});const alt=E.find(o=>o.id===e.id);
+        if(alt){/* Spiele: Datum und Titel kommen aus dem Spielplan, änderbar sind Zuschlag, Status, Notiz */
+          if(alt.quelle==='auto'){alt.zuschlag=e.zuschlag;alt.status=e.status;alt.notiz=e.notiz;alt.geaendert=new Date().toISOString()}
+          else Object.assign(alt,e,{quelle:alt.quelle,geaendert:new Date().toISOString()})}
+        else E.push(Object.assign(e,{quelle:x.event&&x.event.quelle==='recherche'?'recherche':'manuell',vorlaeufig:!!(x.event&&x.event.vorlaeufig),geaendert:new Date().toISOString()}))}
+      eventsSchreiben(E);return json(eventsAntwort())}finally{lock.releaseLock()}}
+  if(x.typ==='grundpreiseSpeichern'){const gp={};for(const k in (x.preise||{})){const m=/^([a-z]+)-(\d+)$/.exec(k);const n=Number(x.preise[k]);
+      if(m&&HAEUSER[m[1]]&&HAEUSER[m[1]].wgs.indexOf(+m[2])>=0&&isFinite(n)&&n>0&&n<=5000)gp[k]=Math.round(n)}
+    PropertiesService.getScriptProperties().setProperty('grundpreise',JSON.stringify(gp));return json({ok:true,grundpreise:gp})}
   if(x.typ==='liste'){const ab=plus(heuteIso(),-14);return json({ok:true,heute:heuteIso(),haeuser:Object.keys(HAEUSER).map(k=>({id:k,name:HAEUSER[k].name,wgs:HAEUSER[k].wgs,namen:HAEUSER[k].namen})),
     buchungen:ergaenzen(buchungenLesen()).filter(b=>b.status!=='storniert'&&(b.abreise||b.anreise)>=ab)})}
   /* Veröffentlichen: alle Änderungen der Admin-Seite auf einmal – danach EINMAL die Tabellen neu schreiben.

@@ -119,7 +119,26 @@ main{padding-bottom:120px}
 .ez b{display:block;font-size:16px}.ez small{display:block;font-size:12px;color:#8A8A8A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .neuz{display:flex;align-items:center;gap:12px;width:100%;text-align:left;font:inherit;color:#161616;background:#fff;border:1px solid #ECECEC;border-radius:14px;padding:10px 12px;cursor:pointer}
 .neut{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}.neut b{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.neut span{font-size:13px;color:#666}
-.neuz .pfeil{font-size:22px;color:#AAA}.st.de b{color:#FF3D00}
+.neuz .pfeil{font-size:22px;color:#AAA}
+/* Reiter Events */
+.reiter.klein2{margin:-4px 0 12px}.reiter.klein2 button{min-height:34px;font-size:13px}
+.evkal{background:#fff;border-radius:16px;padding:10px 8px}
+.evwt,.evgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}.evwt span{text-align:center;font-size:11px;font-weight:700;color:#8A8A8A;padding-bottom:4px}
+.evtag{position:relative;aspect-ratio:1/1.12;border:0;border-radius:10px;background:#F6F6F6;font:inherit;color:#161616;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:5px 2px 3px;gap:1px;min-width:0}
+.evtag b{font-size:14px}.evtag small{font-size:10px;font-weight:800;color:#8A2400}.evtag.stark{box-shadow:inset 0 0 0 1.5px #C23A00}
+.evtag i{position:absolute;bottom:4px;display:flex;gap:2px}.evtag em,.evleg em{display:inline-block;width:6px;height:6px;border-radius:3px}
+.evtag.heute{box-shadow:inset 0 0 0 2px #161616}.evtag.vorbei{opacity:.45}
+.evleg{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:#555;margin:10px 4px 0}.evleg span{display:flex;align-items:center;gap:5px}.evleg .evfl{width:12px;height:12px;border-radius:3px;background:rgba(255,61,0,.35)}
+.evzeile{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;color:#161616;background:#fff;border:0;border-radius:14px;padding:10px 12px 10px 0;margin:0 0 8px;cursor:pointer;overflow:hidden}
+.blatt .evzeile{border:1px solid #ECECEC;margin:0}
+.evzeile.aus{opacity:.5}
+.evbalken{flex:none;width:5px;align-self:stretch;border-radius:0 3px 3px 0}
+.evtext{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}.evtext b{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.evtext>span{font-size:13px;color:#666}
+.evtags{display:flex;flex-wrap:wrap;gap:4px}.evtags i{font-style:normal;font-size:11px;font-weight:700;background:#F2F2F2;border-radius:6px;padding:1px 6px;color:#555}.evtags i.vl{background:#FFF3D6;color:#8A5A00}
+.evz{flex:none;font-size:16px;font-weight:800;color:#C23A00;font-variant-numeric:tabular-nums}
+.evknoepfe{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0 0}.evknoepfe .knopf{font-size:14px;padding:12px 8px}
+.evzbox{display:flex;justify-content:space-between;align-items:center;background:#FFF1EB;border-radius:12px;padding:12px 14px}.evzbox span{font-size:14px;color:#8A2400}.evzbox b{font-size:22px;color:#C23A00}
+.evpr{text-align:right;font-variant-numeric:tabular-nums}.evpr s{color:#9A9A9A;font-size:13px}.evpr b{font-size:17px}.evpr small{color:#9A9A9A;font-size:12px}.st.de b{color:#FF3D00}
 </style></head>
 <body><header><div class="kz"><div><span class="ort">Admin</span><h1>Buchungen</h1></div><div class="zeiten"><div class="st de"><span>Deutschland</span><b id="dezeit"></b></div><div class="st"><span>Stand</span><b id="stand"></b></div></div></div></header>
 <main id="app"><div class="hinweis">…</div></main>
@@ -249,12 +268,12 @@ main{padding-bottom:120px}
   const monatName=m=>MONATE[+m.slice(5)-1]+' '+m.slice(0,4);
   const kurz=d=>d.slice(8)+'.'+d.slice(5,7)+'.';
   const pKey=p=>p.haus+'|'+p.wg+'|'+p.datum;
-  const REITER=[['buchungen','Buchungen'],['kosten','Putzkosten']];
+  const REITER=[['buchungen','Buchungen'],['kosten','Putzkosten'],['events','Events']];
   const reiter=()=>'<div class="reiter" role="tablist">'+REITER.map(([k,t])=>'<button type="button" role="tab" aria-selected="'+(ansicht===k)+'" data-reiter="'+k+'"'+(ansicht===k?' class="an"':'')+'>'+t+'</button>').join('')+'</div>';
   const monatKopf=()=>'<div class="monatwahl"><button type="button" data-k="zurueck" aria-label="Voriger Monat">‹</button><b>'+monatName(kMonat)+'</b><button type="button" data-k="vor" aria-label="Nächster Monat">›</button></div>';
   const dienstFehler=r=>r&&r.fehler==='typ'?'Der Dienst kennt diesen Reiter noch nicht. Bitte im Skript-Editor die neue Fassung von Code.gs einfügen und eine neue Version bereitstellen.':r&&r.fehler==='passwort'?'Bitte neu anmelden.':'Keine Verbindung. Bitte nochmal versuchen.';
   function reiterWechsel(k){if(k===ansicht)return;ansicht=k;document.querySelector('header h1').textContent=REITER.find(r=>r[0]===k)[1];
-    unten.hidden=k!=='buchungen';if(k==='kosten')kostenLaden(kMonat||deIso().slice(0,7));else zeigen()}
+    unten.hidden=k!=='buchungen';if(k==='kosten')kostenLaden(kMonat||deIso().slice(0,7));else if(k==='events')evLaden();else zeigen()}
   async function kostenLaden(m){kMonat=m;const nr=++kNr;app.innerHTML=reiter()+monatKopf()+'<div class="hinweis">Wird geladen …</div>';
     const r=await dienst({typ:'putzkosten',monat:m}).catch(()=>null);if(nr!==kNr||ansicht!=='kosten')return;
     if(!r||!r.ok){app.innerHTML=reiter()+monatKopf()+'<div class="warn">'+dienstFehler(r)+'</div>';return}
@@ -299,6 +318,7 @@ main{padding-bottom:120px}
     kKette=kKette.then(async()=>{const r=await dienst({typ:'putzkostenSpeichern',monat:m,daten:d}).catch(()=>null);
       if(r&&r.ok)zeige('Gespeichert ✓');else zeige('Speichern ging nicht'+(r&&r.fehler==='typ'?' – bitte die neue Version des Dienstes bereitstellen':'')+'. Bitte nochmal ändern.',true)})}
   function kostenKlick(e){const r=e.target.closest('[data-reiter]');if(r){reiterWechsel(r.dataset.reiter);return true}
+    if(ansicht==='events')return evKlick(e);
     if(ansicht!=='kosten')return false;if(!kDaten)return true;
     const bl=e.target.closest('[data-blatt]');if(bl){blattOeffnen(bl.dataset.blatt,bl.dataset.haus);return true}
     const k=e.target.closest('[data-k]');if(k){kostenLaden(monatPlus(kMonat,k.dataset.k==='vor'?1:-1));return true}
@@ -336,6 +356,7 @@ main{padding-bottom:120px}
     bf.innerHTML=h;blatt.scrollTop=top;if(fokus){const f=bf.querySelector(fokus);if(f)f.focus()}}
   bf.addEventListener('click',e=>{if(!blattArt)return;const t=e.target;
     if(t.closest('[data-b="zu"]')){blatt.close();return}
+    if(/^ev/.test(blattArt)){evBlattKlick(e);return}
     if(blattArt==='neu'){const z=t.closest('[data-neu]');if(z){blatt.close();blattArt=null;if(ansicht!=='buchungen')reiterWechsel('buchungen');oeffnen(z.dataset.neu)}return}
     if(!kDaten)return;const s=kDaten.stand;let geaendert=false;
     const st=t.closest('[data-st]');if(st){const v=st.dataset.wert;if(v)s.status[st.dataset.st]=v;else delete s.status[st.dataset.st];geaendert=true}
@@ -352,6 +373,107 @@ main{padding-bottom:120px}
     if(speichern)kostenSpeichern()}
   bf.addEventListener('input',e=>blattFeld(e,false));
   bf.addEventListener('change',e=>blattFeld(e,true));
+
+  /* ---------- Reiter „Events“: Veranstaltungen und Preis-Vorschläge (Kalender und Liste) ----------
+     Fußball (Heimspiele Borussia) holt der Dienst selbst aus dem Spielplan, am 1. jedes Monats. Alles andere ist
+     recherchiert oder selbst eingetragen. Zuschlag = Vorschlag aus Erfahrungswerten, nicht gemessen.
+     Nächte: volle Zuschlag in den Nächten der Event-Tage, halber in der Nacht davor (Anreise am Vorabend);
+     Messen: die Nächte vor jedem Messetag. Treffen mehrere Events eine Nacht, zählt der höchste Zuschlag. */
+  const EV_ART={fussball:['Fußball','#1F8A4C'],konzert:['Konzert','#7B3FE4'],messe:['Messe','#2563EB'],fest:['Fest / Karneval','#E07B00'],sonstiges:['Sonstiges','#6B6B6B']};
+  const EV_QUELLE={auto:'Spielplan (automatisch)',recherche:'recherchiert – Termin prüfen',manuell:'selbst eingetragen'};
+  let evDaten=null,evAnsicht='kalender',evMonat=null,evNr=0,evTag=null,evId=null;
+  const evAktiv=()=>evDaten.events.filter(e=>e.status!=='aus');
+  function evNaechte(e){const N=[];if(e.art==='messe'){for(let d=plus(e.von,-1);d<e.bis;d=plus(d,1))N.push([d,1])}
+    else{N.push([plus(e.von,-1),.5]);for(let d=e.von;d<=e.bis;d=plus(d,1))N.push([d,1])}return N}
+  /* je Nacht: höchster Zuschlag und die Events dahinter */
+  function evNachtKarte(){const K={};for(const e of evAktiv())for(const[d,f]of evNaechte(e)){const z=Math.round(e.zuschlag*f/5)*5;const k=K[d]||(K[d]={z:0,ev:[]});if(z>k.z)k.z=z;k.ev.push(e)}return K}
+  const evPreis=(gp,z)=>Math.round(gp*(1+z/100));
+  async function evLaden(neu){const nr=++evNr;if(!evMonat)evMonat=deIso().slice(0,7);if(!neu)app.innerHTML=reiter()+'<div class="hinweis">Wird geladen …</div>';
+    const r=neu||await dienst({typ:'events'}).catch(()=>null);if(nr!==evNr||ansicht!=='events')return;
+    if(!r||!r.ok){app.innerHTML=reiter()+'<div class="warn">'+dienstFehler(r)+'</div>';return}evDaten=r;evZeigen()}
+  function evZeigen(){const heute=evDaten.heute;
+    let h=reiter()+'<div class="reiter klein2" role="tablist">'+[['kalender','Kalender'],['liste','Liste']].map(([k,t])=>'<button type="button" role="tab" aria-selected="'+(evAnsicht===k)+'" data-evansicht="'+k+'"'+(evAnsicht===k?' class="an"':'')+'>'+t+'</button>').join('')+'</div>';
+    h+=evAnsicht==='kalender'?evKalender():evListe();
+    h+='<div class="evknoepfe"><button type="button" class="knopf" data-ev="neu">+ Event eintragen</button><button type="button" class="knopf hell" data-ev="einst">Grundpreise &amp; Spielplan</button></div>'
+      +'<div class="klein" style="margin:10px 4px">Zuschläge sind Vorschläge aus Erfahrungswerten. Fußball kommt automatisch aus dem Spielplan (am 1. jedes Monats'+(evDaten.stand?', zuletzt '+kurz(evDaten.stand.slice(0,10)):'')+'). Recherchierte Termine bitte beim Veranstalter prüfen.</div>';
+    app.innerHTML=h}
+  function evKalender(){const K=evNachtKarte();const heute=evDaten.heute;const gp=evDaten.grundpreise||{};const m=evMonat;const y=+m.slice(0,4),mo=+m.slice(5,7);
+    const erster=m+'-01';const wt=(new Date(erster+'T12:00:00Z').getUTCDay()+6)%7;const tageImMonat=new Date(Date.UTC(y,mo,0)).getUTCDate();
+    let h='<div class="monatwahl"><button type="button" data-evm="-1" aria-label="Voriger Monat">‹</button><b>'+monatName(m)+'</b><button type="button" data-evm="1" aria-label="Nächster Monat">›</button></div>'
+      +'<div class="evkal"><div class="evwt">'+['Mo','Di','Mi','Do','Fr','Sa','So'].map(t=>'<span>'+t+'</span>').join('')+'</div><div class="evgrid">';
+    for(let i=0;i<wt;i++)h+='<span class="evleer"></span>';
+    for(let t=1;t<=tageImMonat;t++){const d=m+'-'+String(t).padStart(2,'0');const k=K[d];const am=evAktiv().filter(e=>e.von<=d&&e.bis>=d);
+      const st=k&&k.z>0?'background:rgba(255,61,0,'+Math.min(.1+k.z/200,.32).toFixed(2)+')':'';/* hell genug für dunkle Schrift; ab +30 % zusätzlich ein Rand */
+      h+='<button type="button" class="evtag'+(d===heute?' heute':'')+(d<heute?' vorbei':'')+(k&&k.z>=30?' stark':'')+'" data-evtag="'+d+'" style="'+st+'" aria-label="'+dat(d)+(k?' Zuschlag '+k.z+' Prozent':'')+'">'
+        +'<b>'+t+'</b>'+(k&&k.z?'<small>+'+k.z+'%</small>':'')+'<i>'+am.slice(0,3).map(e=>'<em style="background:'+EV_ART[e.art][1]+'"></em>').join('')+'</i></button>'}
+    h+='</div></div><div class="evleg">'+Object.values(EV_ART).map(([t,c])=>'<span><em style="background:'+c+'"></em>'+t+'</span>').join('')+'<span><em class="evfl"></em>Nacht mit Zuschlag</span></div>';
+    /* Monatsübersicht unter dem Kalender */
+    const M=evAktiv().filter(e=>e.bis>=m+'-01'&&e.von<=m+'-31').sort((a,b)=>a.von.localeCompare(b.von));
+    h+='<div class="abschnitt">Im '+MONATE[mo-1]+' ('+M.length+')</div>'+(M.length?M.map(evZeile).join(''):'<div class="kkarte"><div class="kleer">Keine Events in diesem Monat bekannt.</div></div>');
+    return h}
+  function evZeile(e){const[at,c]=EV_ART[e.art]||EV_ART.sonstiges;const tage=e.bis>e.von?dat(e.von)+' – '+dat(e.bis):dat(e.von);
+    return'<button type="button" class="evzeile'+(e.status==='aus'?' aus':'')+'" data-evid="'+esc(e.id)+'"><span class="evbalken" style="background:'+c+'"></span><span class="evtext"><b>'+esc(e.titel)+'</b>'
+      +'<span>'+tage+(e.ort?' · '+esc(e.ort):'')+'</span><span class="evtags"><i style="color:'+c+'">'+at+'</i>'+(e.vorlaeufig?'<i class="vl">Termin vorläufig</i>':'')+(e.quelle==='recherche'?'<i class="vl">prüfen</i>':'')+(e.status==='aus'?'<i>ausgeblendet</i>':'')+'</span></span>'
+      +'<span class="evz">'+(e.zuschlag>0?'+':'')+e.zuschlag+'%</span></button>'}
+  function evListe(){const heute=evDaten.heute;const L=evDaten.events.filter(e=>e.bis>=heute).sort((a,b)=>(a.status==='aus')-(b.status==='aus')||a.von.localeCompare(b.von));
+    if(!L.length)return'<div class="kkarte"><div class="kleer">Keine kommenden Events.</div></div>';let h='',mon='';
+    for(const e of L){const mm=e.status==='aus'?'aus':e.von.slice(0,7);if(mm!==mon){mon=mm;h+='<div class="abschnitt">'+(mm==='aus'?'Ausgeblendet':monatName(mm))+'</div>'}h+=evZeile(e)}return h}
+  /* Pop-ups */
+  function evBlattOeffnen(art){blattArt=art;evBlattZeichnen();bf.onsubmit=e=>{e.preventDefault();if(blattArt==='evForm')evSpeichern()};if(!blatt.open)blatt.showModal();blatt.scrollTop=0}
+  function evBlattZeichnen(){const gp=evDaten.grundpreise||{};let h='';
+    if(blattArt==='evTag'){const d=evTag;const k=evNachtKarte()[d];const am=[...new Set((k?k.ev:[]).concat(evAktiv().filter(e=>e.von<=d&&e.bis>=d)))].sort((a,b)=>a.von.localeCompare(b.von));const z=k?k.z:0;
+      h='<div class="bkopf"><div class="bkt"><h2>'+dat(d)+' '+d.slice(0,4)+'</h2><div class="unter">Nacht '+dat(d)+' → '+dat(plus(d,1))+'</div></div>'+SCHLIESSEN+'</div>'
+        +'<div class="evzbox"><span>Vorschlag für diese Nacht</span><b>'+(z?'+'+z+' %':'kein Zuschlag')+'</b></div>'
+        +(z?'<div class="einst">'+evDaten.haeuser.map(hs=>hs.wgs.map(w=>{const g=+gp[hs.id+'-'+w]||0;return'<div class="ez"><span><b>'+esc(hs.name.replace(/ \d+$/,''))+' · WG '+w+'</b><small>'+esc((hs.namen||{})[w]||'')+'</small></span><span class="evpr">'+(g?'<s>'+g+' €</s> <b>'+evPreis(g,z)+' €</b>':'<small>Grundpreis fehlt</small>')+'</span></div>'}).join('')).join('')+'</div>':'')
+        +(am.length?'<div class="abschnitt" style="margin:4px 0 0">Events</div>'+am.map(evZeile).join(''):'<div class="kleer">Kein Event an diesem Tag.</div>')
+        +'<button type="button" class="knopf hell" data-ev="neu" data-von="'+d+'">+ Event an diesem Tag eintragen</button>'}
+    else if(blattArt==='evForm'){const e=evId?evDaten.events.find(x=>x.id===evId):{von:evTag||evDaten.heute,bis:'',titel:'',ort:'',art:'konzert',zuschlag:20,notiz:'',link:'',quelle:'manuell'};const auto=e.quelle==='auto';
+      h='<div class="bkopf"><div class="bkt"><h2>'+(evId?esc(e.titel):'Event eintragen')+'</h2><div class="unter">'+esc(EV_QUELLE[e.quelle]||'')+(e.vorlaeufig?' · Termin vorläufig':'')+'</div></div>'+SCHLIESSEN+'</div>'
+        +(auto?'<div class="klein">Datum und Gegner kommen aus dem Spielplan. Ändern kannst du den Zuschlag und die Notiz, oder das Spiel ausblenden.</div>':
+          '<label class="feld">Titel<input name="titel" maxlength="120" required value="'+esc(e.titel)+'" placeholder="z. B. Take That, Sparkassenpark"></label>'
+          +'<div class="raster"><label class="feld">Von<input type="date" name="von" required value="'+esc(e.von)+'"></label><label class="feld">Bis<input type="date" name="bis" value="'+esc(e.bis>e.von?e.bis:'')+'"></label>'
+          +'<label class="feld">Art<select name="art">'+Object.keys(EV_ART).map(k=>'<option value="'+k+'"'+(e.art===k?' selected':'')+'>'+EV_ART[k][0]+'</option>').join('')+'</select></label>'
+          +'<label class="feld">Ort<input name="ort" maxlength="80" value="'+esc(e.ort)+'" placeholder="z. B. Sparkassenpark"></label></div>')
+        +'<label class="feld">Zuschlag (%)<input name="zuschlag" inputmode="numeric" value="'+esc(e.zuschlag)+'"></label>'
+        +'<label class="feld">Notiz<input name="notiz" maxlength="200" value="'+esc(e.notiz)+'"></label>'
+        +(auto?'':'<label class="feld">Link zur Quelle<input name="link" inputmode="url" value="'+esc(e.link)+'" placeholder="https://…"></label>')
+        +(e.link?'<a class="klein" href="'+esc(e.link)+'" target="_blank" rel="noopener">Quelle öffnen ↗</a>':'')
+        +'<div class="knoepfe">'+(evId?'<button type="button" class="knopf rot" data-ev="weg">'+(auto?(e.status==='aus'?'Einblenden':'Ausblenden'):'Löschen')+'</button>':'')+'<button class="knopf" id="evOk">Speichern</button></div>'}
+    else if(blattArt==='evEinst'){
+      h='<div class="bkopf"><div class="bkt"><h2>Grundpreise</h2><div class="unter">Normaler Preis je Nacht – daraus rechnet der Kalender den Vorschlag</div></div>'+SCHLIESSEN+'</div>'
+        +evDaten.haeuser.map(hs=>'<div class="abschnitt" style="margin:4px 0 0">'+esc(hs.name)+'</div><div class="einst">'+hs.wgs.map(w=>{const k=hs.id+'-'+w;
+          return'<label class="ez"><span><b>WG '+w+'</b><small>'+esc((hs.namen||{})[w]||'')+'</small></span><span class="kpreis"><input inputmode="numeric" autocomplete="off" data-gp="'+k+'" value="'+esc(gp[k]||'')+'" placeholder="0" aria-label="Grundpreis je Nacht, '+esc(hs.name)+' WG '+w+'">€</span></label>'}).join('')+'</div>').join('')
+        +'<button type="button" class="knopf hell" data-ev="spielplan">Spielplan jetzt aktualisieren</button>'
+        +'<div class="meldung" id="bMeld"></div>'}
+    const top=blatt.scrollTop;bf.innerHTML=h;blatt.scrollTop=top}
+  function evKlick(e){if(!evDaten)return true;const t=e.target;
+    const a=t.closest('[data-evansicht]');if(a){evAnsicht=a.dataset.evansicht;evZeigen();return true}
+    const m=t.closest('[data-evm]');if(m){evMonat=monatPlus(evMonat,+m.dataset.evm);evZeigen();return true}
+    const d=t.closest('[data-evtag]');if(d){evTag=d.dataset.evtag;evBlattOeffnen('evTag');return true}
+    const z=t.closest('[data-evid]');if(z){evId=z.dataset.evid;evBlattOeffnen('evForm');return true}
+    const b=t.closest('[data-ev]');if(b){if(b.dataset.ev==='neu'){evId=null;evTag=null;evBlattOeffnen('evForm')}else if(b.dataset.ev==='einst')evBlattOeffnen('evEinst');return true}
+    return true}
+  function evBlattKlick(e){const t=e.target;
+    const z=t.closest('[data-evid]');if(z){evId=z.dataset.evid;blattArt='evForm';evBlattZeichnen();return}
+    const b=t.closest('[data-ev]');if(!b)return;const was=b.dataset.ev;
+    if(was==='neu'){evId=null;evTag=b.dataset.von||null;blattArt='evForm';evBlattZeichnen();return}
+    if(was==='weg'){const ev=evDaten.events.find(x=>x.id===evId);if(!ev)return;
+      if(ev.quelle==='auto'&&ev.status==='aus'){evSchicken({typ:'eventSpeichern',event:Object.assign({},ev,{status:''})});return}
+      if(!confirm(ev.quelle==='auto'?'Dieses Spiel ausblenden? Es kommt beim nächsten Abruf nicht wieder.':'„'+ev.titel+'“ löschen?'))return;evSchicken({typ:'eventLoeschen',id:ev.id});return}
+    if(was==='spielplan'){b.disabled=true;b.textContent='Spielplan wird geholt …';dienst({typ:'eventsAktualisieren'}).catch(()=>null).then(r=>{
+      if(r&&r.ok){evDaten=r;evZeigen();evBlattZeichnen();const m=document.getElementById('bMeld');if(m)m.textContent=(r.ergebnis?r.ergebnis.spiele+' Heimspiele gefunden, '+r.ergebnis.neu+' neu':'')+' ✓'}
+      else{b.disabled=false;b.textContent='Spielplan jetzt aktualisieren';alert(dienstFehler(r))}})}}
+  function evSpeichern(){const f=bf.elements;const ev=evId?evDaten.events.find(x=>x.id===evId):{};const z=parseInt(String(f.zuschlag.value).replace(/[^\d-]/g,''),10);
+    const neu=Object.assign({},ev,{id:evId||undefined,zuschlag:isFinite(z)?z:0,notiz:f.notiz.value});
+    if(f.titel){Object.assign(neu,{titel:f.titel.value,von:f.von.value,bis:f.bis.value||f.von.value,art:f.art.value,ort:f.ort.value,link:f.link.value.trim()});
+      if(!neu.titel.trim()||!neu.von){alert('Bitte Titel und Datum eintragen.');return}if(neu.bis<neu.von){alert('„Bis“ liegt vor „Von“.');return}}
+    evSchicken({typ:'eventSpeichern',event:neu})}
+  function evSchicken(o){const ok=bf.querySelector('#evOk');if(ok){ok.disabled=true;ok.textContent='Wird gespeichert …'}
+    dienst(o).catch(()=>null).then(r=>{if(r&&r.ok){evDaten=r;blatt.close();evZeigen()}else{if(ok){ok.disabled=false;ok.textContent='Speichern'}alert(r&&r.fehler==='eingabe'?'Bitte Titel und Datum prüfen.':dienstFehler(r))}})}
+  /* Grundpreise: Feld verlassen → speichern */
+  bf.addEventListener('change',e=>{if(blattArt!=='evEinst'||!e.target.dataset.gp)return;const gp=Object.assign({},evDaten.grundpreise||{});const n=parseInt(e.target.value,10);
+    if(n>0)gp[e.target.dataset.gp]=n;else delete gp[e.target.dataset.gp];const m=document.getElementById('bMeld');if(m)m.textContent='Wird gespeichert …';
+    dienst({typ:'grundpreiseSpeichern',preise:gp}).catch(()=>null).then(r=>{const m2=document.getElementById('bMeld');if(r&&r.ok){evDaten.grundpreise=r.grundpreise;if(m2)m2.textContent='Gespeichert ✓'}else if(m2){m2.style.color='#D93636';m2.textContent='Speichern ging nicht.'}})});
 
   /* ---------- Neue Buchungen: beim Öffnen ein Pop-up mit allem, was seit dem letzten Öffnen dazugekommen ist ----------
      Grundlage ist dieselbe Merkliste wie beim ✨ im Kalender (je Gerät). Jede Buchung erscheint EINMAL im Pop-up;
