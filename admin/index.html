@@ -136,7 +136,11 @@ main{padding-bottom:120px}
   /* Angemeldet bleiben: die PIN merkt sich nur DIESES Gerät, 7 Tage lang */
   const TAGE7=7*864e5;let pin='';try{pin=localStorage.getItem('putzplan.pin')||'';if(!(+localStorage.getItem('putzplan.pinBis')>Date.now())){pin='';localStorage.removeItem('putzplan.pin')}}catch(e){}
   let daten=null;const offen=new Map();let neuNr=0,scrollX=null;let ansicht='buchungen';
-  const dienst=o=>fetch(D,{method:'POST',body:JSON.stringify({...o,pin})}).then(r=>r.json());
+  /* Reine Lese-Abfragen fassen nach 1,5 s einmal nach – der Dienst hat ab und zu einen kurzen Aussetzer (v. a. direkt nach
+     einer neuen Version). Schreibende Abfragen NIE wiederholen: Kam die erste doch an, gäbe es eine Buchung doppelt. */
+  const NUR_LESEN=['login','liste','putzkosten'];
+  const dienstEinmal=o=>fetch(D,{method:'POST',body:JSON.stringify({...o,pin})}).then(r=>r.json());
+  const dienst=o=>dienstEinmal(o).catch(err=>{if(!NUR_LESEN.includes(o.typ))throw err;return new Promise(r=>setTimeout(r,1500)).then(()=>dienstEinmal(o))});
   const WT=['So','Mo','Di','Mi','Do','Fr','Sa'];
   /* Alle Zeiten nach deutscher Zeit – der Admin wird auch aus dem Ausland (Thailand) bedient */
   const deUhr=()=>new Date().toLocaleTimeString('de-DE',{timeZone:'Europe/Berlin',hour:'2-digit',minute:'2-digit'});
