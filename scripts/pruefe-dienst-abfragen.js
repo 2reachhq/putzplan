@@ -2,7 +2,7 @@
 /* Jede Abfrage, die die Admin-Seite schickt, muss der Dienst kennen (sonst „Keine Verbindung“) – Vorfall 06.11.2026 */
 const vm=require('vm'),fs=require('fs');const [gs,adm]=process.argv.slice(2);
 const typen=[...new Set([...fs.readFileSync(adm,'utf8').matchAll(/typ:'([a-zA-Z]+)'/g)].map(m=>m[1]))];
-const ctx={console,Utilities:{formatDate:()=>'2026-11-06'},ContentService:{MimeType:{JSON:'json'},createTextOutput:t=>({setMimeType(){return t}})},
+const ctx={console,SpreadsheetApp:{flush(){}},Utilities:{formatDate:()=>'2026-11-06'},ContentService:{MimeType:{JSON:'json'},createTextOutput:t=>({setMimeType(){return t}})},
   LockService:{getScriptLock:()=>({waitLock(){},tryLock(){return true},releaseLock(){}})},
   PropertiesService:{getScriptProperties:()=>({getProperty:()=>null,setProperty(){}})},ScriptApp:{getProjectTriggers:()=>[{getHandlerFunction:()=>'eventsMonatlich'}]}};
 vm.createContext(ctx);vm.runInContext(fs.readFileSync(gs,'utf8'),ctx);

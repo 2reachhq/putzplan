@@ -121,12 +121,30 @@ function abgleich(tage){const lock=LockService.getScriptLock();if(!lock.tryLock(
     for(const[art,msg]of neu){const m={subject:msg.getSubject(),text:msg.getPlainBody(),datum:msg.getDate().getTime(),von:msg.getFrom()};let x=null;
       try{x=art==='ab'?leseAirbnb(m):art==='bk'?leseBooking(m):leseBookingNachricht(m)}catch(e){console.error(e)}
       if(x){x.mailZeit=m.datum;const vorher=(L.find(o=>o.id===x.id)||{}).abreise;if(zusammen(L,x)){n++;geaendert.push(Object.assign({},L.find(o=>o.id===x.id),{alteAbreise:vorher}))}}}
+    for(const b of stornoNachlauf(L)){n++;geaendert.push(Object.assign({},b,{alteAbreise:b.abreise}))}
+    /* Erst die Buchungen sichern, DANN die Mails als gesehen merken – andersherum ginge ein Storno für immer verloren,
+       wenn der Lauf dazwischen abbricht (die Mail gälte als erledigt, die Buchung bliebe aktiv). */
+    if(n){buchungenSchreiben(L);SpreadsheetApp.flush()}
     if(neuGesehen.length){const ab=sh.getLastRow()+1;const fehlt=ab+neuGesehen.length-1-sh.getMaxRows();if(fehlt>0)sh.insertRowsAfter(sh.getMaxRows(),fehlt+100);
       sh.getRange(ab,1,neuGesehen.length,1).setNumberFormat('@').setValues(neuGesehen)}
-    if(n)buchungenSchreiben(L);
-    oeffentlichSchreiben(L);
+    oeffentlichSchreiben(L);SpreadsheetApp.flush();
     try{sofortMelden(L,geaendert)}catch(e){console.error(e)}}
   finally{lock.releaseLock()}}
+
+/* Storno-Nachlauf (12.11.2026): Zwei Airbnb-Stornos (HMK2XJHKD2, HM22ME85CX) standen als „gesehen“ im Blatt, die Buchungen
+   blieben aber aktiv – am 14.11. hätte die Putzkraft für 5 Gäste geputzt, die nie kamen. Deshalb verlässt sich der Storno
+   nicht mehr auf „gesehen“: Bei JEDEM Lauf werden alle Storno-Mails der letzten 60 Tage noch einmal gegen die Tabelle
+   gehalten. Steht eine davon noch aktiv drin, wird sie storniert. Das ist doppelt und bewusst so – ein Storno, das verloren
+   geht, schickt jemanden umsonst putzen und blockiert die Wohnung für eine neue Buchung. Nur der Betreff wird gelesen. */
+function stornoNachlauf(L){const raus=[];const Q='((from:automated@airbnb.com subject:"Storniert: Buchung") OR (from:noreply@booking.com subject:storniert)) newer_than:60d';
+  const jetzt=new Date().toISOString();
+  for(let start=0;start<500;start+=100){const th=GmailApp.search(Q,start,100);
+    for(const thr of th){const s=String(thr.getFirstMessageSubject()||'').replace(/\s+/g,' ').trim();let x=null;
+      try{x=leseAirbnb({subject:s,text:''})||leseBooking({subject:s,text:''})}catch(e){console.error(e)}
+      if(!x||x.status!=='storniert')continue;const b=L.find(o=>o.id===x.id);
+      if(b&&b.status!=='storniert'){b.status='storniert';b.pruefen='';b.geaendert=jetzt;raus.push(b);console.warn('Storno nachgetragen: '+b.id)}}
+    if(th.length<100)break}
+  return raus}
 
 /* Fehlt die Abreise und beginnt am NÄCHSTEN Tag in derselben Wohnung die nächste Buchung, war es genau eine Nacht
    (Betreiber: „einen Tag hintereinander heißt immer einen Tag“). Die Abreise wird dann abgeleitet, nicht gespeichert –
@@ -227,7 +245,7 @@ function eventsAktualisieren(){const heute=heuteIso();const lock=LockService.get
     for(const x of S){const e=spielZuEvent(x,heute);if(!e.von||e.von<plus(heute,-31))continue;const alt=E.find(o=>o.id===e.id);
       if(alt){alt.von=e.von;alt.bis=e.bis;alt.titel=e.titel;alt.vorlaeufig=e.vorlaeufig;if(alt.quelle==='auto'&&!alt.geaendert)alt.notiz=e.notiz}
       else{E.push(e);neu++}}
-    eventsSchreiben(E);PropertiesService.getScriptProperties().setProperty('events_stand',new Date().toISOString());return{spiele:S.length,neu:neu}}
+    eventsSchreiben(E);SpreadsheetApp.flush();PropertiesService.getScriptProperties().setProperty('events_stand',new Date().toISOString());return{spiele:S.length,neu:neu}}
   finally{lock.releaseLock()}}
 function eventsMonatlich(){eventsAktualisieren()}
 /* Zeitauslöser am 1. jedes Monats – legt sich selbst an, sobald der Admin den Reiter öffnet */
@@ -300,7 +318,7 @@ function doPost(e){let x={};try{x=JSON.parse(e.postData.contents)}catch(err){ret
   const MONAT=/^\d{4}-(0[1-9]|1[0-2])$/;
   if(x.typ==='putzkosten'){if(!MONAT.test(String(x.monat||'')))return json({fehler:'monat'});return json(putzkosten(x.monat))}
   if(x.typ==='putzkostenSpeichern'){if(!MONAT.test(String(x.monat||'')))return json({fehler:'monat'});
-    const lock=LockService.getScriptLock();lock.waitLock(20000);try{const d=kostenPruefen(x.daten);kostenSchreiben(x.monat,d);return json({ok:true,daten:d})}finally{lock.releaseLock()}}
+    const lock=LockService.getScriptLock();lock.waitLock(20000);try{const d=kostenPruefen(x.daten);kostenSchreiben(x.monat,d);SpreadsheetApp.flush();return json({ok:true,daten:d})}finally{lock.releaseLock()}}
   if(x.typ==='events'){try{eventsAusloeser()}catch(e){console.error(e)}
     const st=PropertiesService.getScriptProperties().getProperty('events_stand');
     /* noch nie oder vor über 31 Tagen geholt: jetzt holen (z. B. falls der Monatsauslöser einmal ausfiel) */
@@ -317,7 +335,7 @@ function doPost(e){let x={};try{x=JSON.parse(e.postData.contents)}catch(err){ret
           if(alt.quelle==='auto'){alt.zuschlag=e.zuschlag;alt.status=e.status;alt.notiz=e.notiz;alt.geaendert=new Date().toISOString()}
           else Object.assign(alt,e,{quelle:alt.quelle,geaendert:new Date().toISOString()})}
         else E.push(Object.assign(e,{quelle:x.event&&x.event.quelle==='recherche'?'recherche':'manuell',vorlaeufig:!!(x.event&&x.event.vorlaeufig),geaendert:new Date().toISOString()}))}
-      eventsSchreiben(E);return json(eventsAntwort())}finally{lock.releaseLock()}}
+      eventsSchreiben(E);SpreadsheetApp.flush();return json(eventsAntwort())}finally{lock.releaseLock()}}
   if(x.typ==='grundpreiseSpeichern'){const gp={};for(const k in (x.preise||{})){const m=/^([a-z]+)-(\d+)$/.exec(k);const n=Number(x.preise[k]);
       if(m&&HAEUSER[m[1]]&&HAEUSER[m[1]].wgs.indexOf(+m[2])>=0&&isFinite(n)&&n>0&&n<=5000)gp[k]=Math.round(n)}
     PropertiesService.getScriptProperties().setProperty('grundpreise',JSON.stringify(gp));return json({ok:true,grundpreise:gp})}
@@ -336,7 +354,7 @@ function doPost(e){let x={};try{x=JSON.parse(e.postData.contents)}catch(err){ret
           if(k==='wg'||k==='gaeste')v=v===''||v==null?'':Math.max(0,Math.min(40,parseInt(v,10)||0))||'';if(k==='status'&&v!=='storniert')v='bestaetigt';
           if(k==='gast')v=String(v||'').slice(0,80);b[k]=v}
         b.admin=jetzt;b.geaendert=jetzt;b.pruefen='';fertig.push({vorher:a.id,buchung:b,alteAbreise:vorher})}
-      buchungenSchreiben(L);oeffentlichSchreiben(L);
+      buchungenSchreiben(L);oeffentlichSchreiben(L);SpreadsheetApp.flush();
       try{sofortMelden(L,fertig.map(x=>Object.assign({},x.buchung,{alteAbreise:x.alteAbreise})))}catch(e){console.error(e)}
       return json({ok:true,fertig:fertig.map(x=>({vorher:x.vorher,buchung:x.buchung}))})}
     finally{lock.releaseLock()}}
