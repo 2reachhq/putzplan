@@ -27,7 +27,7 @@ const INSERATE={
   'City-Apartment für Familien 5 Per, 8 Min zum Hbf!':['kranz',3],'Zentrales & ruhiges Apartment in Mönchengladbach':['kranz',4],
   '5 Min zur City | 4 Gäste | Ruhige Lage':['poether',1],'5 Min City | Zentral & Ruhig | Komfort für 2 Pers.':['poether',2],
   'Helles Apartment für 4 Personen in ruhiger Lage':['poether',3]};
-const SPALTEN=['id','quelle','code','gast','haus','wg','anreise','abreise','gaeste','status','unterkunft','geaendert','admin','pruefen','frueh','spaet','notiz'];
+const SPALTEN=['id','quelle','code','gast','haus','wg','anreise','abreise','gaeste','status','unterkunft','geaendert','admin','pruefen','frueh','spaet','notiz','gebucht','ausweis','ausweisBest','ausweisErinnert'];
 /* frueh = Early Check-in (Uhrzeit), spaet = Late Check-out (Uhrzeit), notiz = Hinweis für die Putzkräfte – nur vom Admin, nie aus Mails */
 
 const T={
@@ -118,10 +118,13 @@ function abgleich(tage){const lock=LockService.getScriptLock();if(!lock.tryLock(
       if(th.length<100)break}}
     /* ältere Mails zuerst – sonst überschreibt eine alte Änderung eine neuere */
     neu.sort((a,b)=>a[1].getDate().getTime()-b[1].getDate().getTime());
+    const gastPost=[];
     for(const[art,msg]of neu){const m={subject:msg.getSubject(),text:msg.getPlainBody(),datum:msg.getDate().getTime(),von:msg.getFrom()};let x=null;
       try{x=art==='ab'?leseAirbnb(m):art==='bk'?leseBooking(m):leseBookingNachricht(m)}catch(e){console.error(e)}
+      if(art==='bn'&&x)try{gastPost.push({id:x.id,anhang:ausweisAnhang(msg),text:gastText(m.text),datum:m.datum})}catch(e){console.error(e)}
       if(x){x.mailZeit=m.datum;const vorher=(L.find(o=>o.id===x.id)||{}).abreise;if(zusammen(L,x)){n++;geaendert.push(Object.assign({},L.find(o=>o.id===x.id),{alteAbreise:vorher}))}}}
     for(const b of stornoNachlauf(L)){n++;geaendert.push(Object.assign({},b,{alteAbreise:b.abreise}))}
+    try{n+=ausweisLauf(L,gastPost)}catch(e){console.error('Ausweis',e)}
     /* Erst die Buchungen sichern, DANN die Mails als gesehen merken – andersherum ginge ein Storno für immer verloren,
        wenn der Lauf dazwischen abbricht (die Mail gälte als erledigt, die Buchung bliebe aktiv). */
     if(n){buchungenSchreiben(L);SpreadsheetApp.flush()}
@@ -130,6 +133,60 @@ function abgleich(tage){const lock=LockService.getScriptLock();if(!lock.tryLock(
     oeffentlichSchreiben(L);SpreadsheetApp.flush();
     try{sofortMelden(L,geaendert)}catch(e){console.error(e)}}
   finally{lock.releaseLock()}}
+
+/* ---------- Ausweis vor Anreise (nur Booking, Betreiber 16.11.2026) ----------
+   Booking schickt nach jeder neuen Buchung automatisch die Bitte um ein Ausweisfoto (Vorlage im Extranet). Der Dienst:
+   1. merkt sich, wann die Buchung kam (gebucht) – nur Buchungen ab AUSWEIS_AB, ältere Gäste wurden nie gefragt;
+   2. erkennt die Antwort des Gastes am echten Anhang (Bild/PDF, nicht eingebettet: Booking schickt seine Symbole selbst
+      als eingebettete Bilder mit) und trägt „ausweis“ ein – oder der Betreiber tippt im Admin „Ausweis erhalten“;
+   3. schreibt dem Gast dann EINMAL kurz über Booking zurück (ausweisBest);
+   4. fehlt der Ausweis 3 Tage vor Anreise, geht EINE Mail an den Betreiber mit einem fertigen Text (ausweisErinnert).
+   Antwortet ein Gast ohne erkennbaren Anhang, bekommt der Betreiber eine kurze Mail – ob Booking Fotos überhaupt als
+   Anhang weiterleitet, war beim Bau nicht prüfbar. */
+const AUSWEIS_AB='2026-11-16T15:45:00Z';
+const AUSWEIS_MAIL='sk@2reach.de';
+const ausweisAnhang=msg=>msg.getAttachments({includeInlineImages:false}).filter(a=>/^image\/|pdf/i.test(a.getContentType())&&a.getSize()>15000).length;
+function gastText(t){const s=String(t||'').replace(/\r/g,'');const a=s.search(/Nachricht von [^:\n]+:/);let n=a<0?'':s.slice(a).replace(/^Nachricht von [^:\n]+:/,'');
+  const e=n.search(/\n\s*Antworten\s*\n/);if(e>=0)n=n.slice(0,e);return n.replace(/\s+/g,' ').trim().slice(0,400)}
+const ausweisPflicht=(b,heute)=>b.quelle==='booking'&&!!b.gebucht&&b.gebucht>=AUSWEIS_AB&&b.status!=='storniert'&&!!b.anreise&&b.anreise>=heute;
+const vorname=g=>{const t=String(g||'').trim().split(/\s+/);return t.length>1?t[t.length-1]:t[0]||''};/* Booking schreibt „Nachname Vorname“ */
+function ausweisDank(b){const v=vorname(b.gast);
+  return'Hi'+(v?' '+v:'')+' 👋🏻\n\nvielen Dank, wir haben alles erhalten! Die Zugangsdaten bekommst du einen Tag vor deiner Anreise. Falls du Fragen hast, melde dich gern.\n\nViele Grüße\nPrathee\n\n—\n\nThank you, we have received everything! You will get the access details one day before your arrival. If you have any questions, just let us know.\n\nBest regards\nPrathee'}
+function ausweisBitte(b){const v=vorname(b.gast);
+  return'Hi'+(v?' '+v:'')+' 👋🏻\n\nwir haben noch kein Foto deines Personalausweises oder Reisepasses (Vorder- und Rückseite) bekommen. Bitte schick es uns kurz als Antwort auf diese Nachricht – danach erhältst du die Zugangsdaten.\n\nViele Grüße\nPrathee\n\n—\n\nWe have not received a photo of your ID card or passport (front and back) yet. Please send it to us in reply to this message – you will then receive the access details.\n\nBest regards\nPrathee'}
+function wohnText(b){const H=HAEUSER[b.haus];return(H?H.name:'?')+' · WG '+(b.wg||'?')+((H&&H.namen&&H.namen[b.wg])?' ('+H.namen[b.wg]+')':'')}
+const bookingLink=b=>'https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/messaging/inbox.html?product_id='+b.code+'&product_type=POST_BOOKING&res_id='+b.code+(b.unterkunft&&/^\d+$/.test(b.unterkunft)?'&hotel_id='+b.unterkunft:'');
+const datDe=d=>d?d.slice(8,10)+'.'+d.slice(5,7)+'.'+d.slice(0,4):'?';
+function anBetreiber(betreff,zeilen){MailApp.sendEmail({to:AUSWEIS_MAIL,subject:betreff,body:zeilen.join('\n'),name:'Putzplan'})}
+/* letzte Nachricht des Gastes über Booking finden – nur darüber kann der Dienst ihm antworten */
+function gastNachricht(b){const th=GmailApp.search('from:guest.booking.com "'+b.code+'" newer_than:120d',0,10);let best=null;
+  for(const t of th)for(const m of t.getMessages())if(String(m.getFrom()).indexOf(b.code+'-')>=0&&(!best||m.getDate()>best.getDate()))best=m;return best}
+function ausweisLauf(L,post){const heute=heuteIso();const jetzt=new Date().toISOString();let n=0;
+  /* 1. Buchungszeitpunkt aus der Booking-Mail „Neue Buchung“ */
+  if(L.some(b=>b.quelle==='booking'&&!b.gebucht&&b.anreise>=heute))
+    for(const t of GmailApp.search('from:noreply@booking.com (subject:"neue Buchung" OR subject:"Last-Minute-Buchung") newer_than:14d',0,100)){
+      const x=leseBooking({subject:t.getFirstMessageSubject()});if(!x||x.status!=='bestaetigt')continue;const b=L.find(o=>o.id===x.id);if(!b||b.gebucht)continue;
+      b.gebucht=t.getMessages()[0].getDate().toISOString();n++}/* auch ältere Buchungen bekommen ihr Datum – sonst würde jeder Lauf erneut suchen; ausweisPflicht() filtert nach AUSWEIS_AB */
+  /* 2. Antworten der Gäste */
+  for(const p of post||[]){const b=L.find(o=>o.id===p.id);if(!b||!ausweisPflicht(b,heute)||b.ausweis)continue;
+    if(p.anhang){b.ausweis=heute;n++;continue}
+    try{anBetreiber('Gast hat geschrieben, kein Ausweis-Anhang erkannt: '+(b.gast||b.code),['Buchung '+b.code+' – '+(b.gast||'')+', '+wohnText(b)+', Anreise '+datDe(b.anreise)+'.','',
+      'Nachricht: '+(p.text||'(ohne Text)'),'','Ein Foto war nicht als Anhang dabei. Falls der Ausweis im Booking-Postfach liegt: im Putzplan-Admin die Buchung öffnen und „Ausweis: erhalten“ wählen – dann bekommt der Gast automatisch die Bestätigung.','',
+      'Booking-Postfach: '+bookingLink(b),'Admin: '+SEITE+'admin/'])}catch(e){console.error(e)}}
+  /* 3. Bestätigung an den Gast – einmal */
+  for(const b of L){if(!ausweisPflicht(b,heute)||!b.ausweis||b.ausweisBest)continue;
+    let m=null;try{m=gastNachricht(b)}catch(e){console.error(e)}
+    if(m){try{m.reply(ausweisDank(b));b.ausweisBest=jetzt}catch(e){console.error(e);b.ausweisBest='fehler '+jetzt}}else b.ausweisBest='kein Postfach '+jetzt;
+    n++;if(/^(fehler|kein)/.test(b.ausweisBest))try{anBetreiber('Bestätigung bitte selbst schicken: '+(b.gast||b.code),['Der Ausweis von '+(b.gast||'')+' ('+b.code+', '+wohnText(b)+') ist eingetragen, aber der Dienst konnte dem Gast nicht über Booking antworten.','','Bitte im Booking-Postfach schreiben: '+bookingLink(b),'','Text zum Kopieren:','',ausweisDank(b)])}catch(e){console.error(e)}}
+  /* 4. Erinnerung an den Betreiber: 3 Tage vor Anreise, frühestens 12 Stunden nach der Buchung, einmal */
+  for(const b of L){if(!ausweisPflicht(b,heute)||b.ausweis||b.ausweisErinnert)continue;
+    if(naechte(heute,b.anreise)>3||Date.now()-Date.parse(b.gebucht)<12*3600e3)continue;
+    try{anBetreiber('Ausweis fehlt: '+(b.gast||b.code)+' – Anreise '+datDe(b.anreise),['Für diese Booking-Buchung ist noch kein Ausweis da:','',
+      'Gast: '+(b.gast||'?'),'Buchung: '+b.code,'Wohnung: '+wohnText(b),'Aufenthalt: '+datDe(b.anreise)+' – '+datDe(b.abreise)+(b.gaeste?' · '+b.gaeste+' Personen':''),'',
+      'Im Booking-Postfach schreiben: '+bookingLink(b),'','Text zum Kopieren:','',ausweisBitte(b),'',
+      'Kommt der Ausweis, im Putzplan-Admin bei der Buchung „Ausweis: erhalten“ wählen – die Bestätigung an den Gast geht dann automatisch raus.'])
+      b.ausweisErinnert=jetzt;n++}catch(e){console.error(e)}}
+  return n}
 
 /* Storno-Nachlauf (12.11.2026): Zwei Airbnb-Stornos (HMK2XJHKD2, HM22ME85CX) standen als „gesehen“ im Blatt, die Buchungen
    blieben aber aktiv – am 14.11. hätte die Putzkraft für 5 Gäste geputzt, die nie kamen. Deshalb verlässt sich der Storno
@@ -347,7 +404,8 @@ function doPost(e){let x={};try{x=JSON.parse(e.postData.contents)}catch(err){ret
     try{const L=buchungenLesen();const fertig=[];const jetzt=new Date().toISOString();
       for(const a of x.aenderungen||[]){let b=/^neu/.test(a.id||'')?null:L.find(o=>o.id===a.id);
         if(!b){if(!/^neu/.test(a.id||''))continue;b={id:'man-'+Date.now()+'-'+fertig.length,quelle:'direkt',status:'bestaetigt'};SPALTEN.forEach(k=>{if(b[k]==null)b[k]=''});L.push(b)}
-        const vorher=b.abreise;const f=a.felder||{};for(const k of['haus','wg','anreise','abreise','gaeste','status','gast','frueh','spaet','notiz'])if(k in f){let v=f[k];
+        const vorher=b.abreise;const f=a.felder||{};for(const k of['haus','wg','anreise','abreise','gaeste','status','gast','frueh','spaet','notiz','ausweis'])if(k in f){let v=f[k];
+          if(k==='ausweis'){b[k]=/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?String(v):'';continue}
           if(k==='frueh'||k==='spaet'){v=/^\d{1,2}:\d{2}$/.test(String(v||''))?String(v):'';b[k]=v;continue}
           if(k==='notiz'){b[k]=String(v||'').replace(/[\r\n]+/g,' ').trim().slice(0,200);continue}
           if(k==='haus'&&!HAEUSER[v])continue;if((k==='anreise'||k==='abreise')&&v&&!/^\d{4}-\d{2}-\d{2}$/.test(v))continue;
