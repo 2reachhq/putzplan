@@ -396,8 +396,8 @@ function doPost(e){let x={};try{x=JSON.parse(e.postData.contents)}catch(err){ret
   if(x.typ==='grundpreiseSpeichern'){const gp={};for(const k in (x.preise||{})){const m=/^([a-z]+)-(\d+)$/.exec(k);const n=Number(x.preise[k]);
       if(m&&HAEUSER[m[1]]&&HAEUSER[m[1]].wgs.indexOf(+m[2])>=0&&isFinite(n)&&n>0&&n<=5000)gp[k]=Math.round(n)}
     PropertiesService.getScriptProperties().setProperty('grundpreise',JSON.stringify(gp));return json({ok:true,grundpreise:gp})}
-  /* 40 Tage zurück: der Admin-Kalender zeigt auch die vergangenen Aufenthalte (gleich wie ZURUECK_TAGE in admin/index.html) */
-  if(x.typ==='liste'){const ab=plus(heuteIso(),-40);return json({ok:true,heute:heuteIso(),haeuser:Object.keys(HAEUSER).map(k=>({id:k,name:HAEUSER[k].name,wgs:HAEUSER[k].wgs,namen:HAEUSER[k].namen})),
+  /* Admin-Kalender zeigt auch vergangene Aufenthalte: ab 15.10.2026, später immer die letzten 6 Monate (gleich wie kalenderVon in admin/index.html) */
+  if(x.typ==='liste'){const ab=(()=>{const d=new Date(heuteIso()+'T12:00:00Z');d.setUTCMonth(d.getUTCMonth()-6);const m=d.toISOString().slice(0,10);return m>'2026-10-15'?m:'2026-10-15'})();return json({ok:true,heute:heuteIso(),haeuser:Object.keys(HAEUSER).map(k=>({id:k,name:HAEUSER[k].name,wgs:HAEUSER[k].wgs,namen:HAEUSER[k].namen})),
     buchungen:ergaenzen(buchungenLesen()).filter(b=>b.status!=='storniert'&&(b.abreise||b.anreise)>=ab)})}
   /* Veröffentlichen: alle Änderungen der Admin-Seite auf einmal – danach EINMAL die Tabellen neu schreiben.
      Jede Änderung: {id, felder}; eine neue Buchung kommt mit id 'neu…'. */

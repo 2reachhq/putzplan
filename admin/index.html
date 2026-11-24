@@ -229,10 +229,12 @@ main{padding-bottom:120px}
   /* Ausweis vor Anreise: gilt nur für Booking-Buchungen ab dem Stichtag (gleich wie AUSWEIS_AB im Dienst) */
   const AUSWEIS_AB='2026-11-16T15:45:00Z';
   function ausweisPflicht(b){return b.quelle==='booking'&&!!b.gebucht&&b.gebucht>=AUSWEIS_AB&&b.status!=='storniert'&&(b.anreise||'')>=daten.heute}
-  /* Kalender reicht ZURUECK_TAGE in die Vergangenheit (Betreiber 24.11.2026: „ab 15.10.“ = gut 5 Wochen), geöffnet wird er bei gestern */
-  const ZURUECK_TAGE=40;
-  function zeigen(){if(ansicht!=='buchungen')return;const heute=daten.heute;const von=plus(heute,-ZURUECK_TAGE);
-    const letzte=alle().reduce((m,b)=>{const x=b.abreise||b.anreise||'';return x>m?x:m},plus(heute,60));const N=Math.min(tage(von,letzte)+3,420);
+  /* Kalender-Beginn (Betreiber 24.11.2026): ab 15.10.2026, sobald das länger als 6 Monate her ist, immer die letzten 6 Monate.
+     Gleich wie kalenderVon im Dienst (Abfrage „liste“). Geöffnet wird der Kalender bei gestern. */
+  const KAL_AB='2026-10-15';
+  const kalenderVon=h=>{const d=new Date(h+'T12:00:00Z');d.setUTCMonth(d.getUTCMonth()-6);const m=d.toISOString().slice(0,10);return m>KAL_AB?m:KAL_AB};
+  function zeigen(){if(ansicht!=='buchungen')return;const heute=daten.heute;const von=kalenderVon(heute);const zurueck=tage(von,heute);
+    const letzte=alle().reduce((m,b)=>{const x=b.abreise||b.anreise||'';return x>m?x:m},plus(heute,60));const N=Math.min(tage(von,letzte)+3,zurueck+413);/* nach vorn reicht er so weit wie früher */
     const L=alle().filter(b=>b.status!=='storniert'&&(b.abreise||b.anreise||'9')>=heute).sort((a,b)=>(a.anreise||'').localeCompare(b.anreise||''));
     const ausw=L.filter(b=>ausweisPflicht(b)&&!b.ausweis);
     const ueber=L.filter(b=>ueberVon(b).length),orange=L.filter(b=>b.pruefen&&!ueber.includes(b)),rot=L.filter(b=>fehlt(b)&&!b.pruefen&&!ueber.includes(b));
@@ -245,7 +247,7 @@ main{padding-bottom:120px}
       +(rot.length?'<div class="abschnitt rot">Fehlt etwas ('+rot.length+')</div>'+rot.map(b=>zeile(b,'rot')).join(''):'')
       +(ausw.length?'<div class="abschnitt rot">Ausweis fehlt noch – Booking ('+ausw.length+')</div>'+ausw.map(b=>zeile(b,'ausweis')).join(''):'')
       +(orange.length?'<div class="abschnitt" style="color:#9A7A00">Vom Gast geändert – bitte bei Airbnb/Booking nachsehen ('+orange.length+')</div>'+orange.map(b=>zeile(b,'orange')).join(''):'');
-    const kals=[...app.querySelectorAll('.kal')];const start=scrollX!=null?scrollX:(ZURUECK_TAGE-1)*W;
+    const kals=[...app.querySelectorAll('.kal')];const start=scrollX!=null?scrollX:(zurueck-1)*W;
     kals.forEach(k=>{k.scrollLeft=start;k.addEventListener('scroll',()=>{scrollX=k.scrollLeft;kals.forEach(o=>{if(o!==k&&Math.abs(o.scrollLeft-k.scrollLeft)>1)o.scrollLeft=k.scrollLeft})},{passive:true})});
     zaehler()}
   /* Direkt zur Buchung im Gastgeber-Bereich (wie die Links in den Mails, ohne deren Sitzungs-Zeichen – dort ggf. einloggen) */
